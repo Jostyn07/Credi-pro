@@ -7,9 +7,17 @@ import CrearOrganizacion from '@/app/onboarding/CrearOrganizacion'
 import SeleccionarPlan from '@/app/onboarding/SeleccionarPlan'
 import Listo from '@/app/onboarding/Listo'
 import Suscripcion from '@/app/organizacion/Suscripcion'
+import Dashboard from '@/app/organizacion/Dashboard'
+import Clientes from '@/app/clientes/Clientes'
+import NuevoCliente from '@/app/clientes/NuevoCliente'
+import ClienteDetalle from '@/app/clientes/ClienteDetalle'
+import Prestamos from '@/app/prestamos/Prestamos'
+import NuevoPrestamo from '@/app/prestamos/NuevoPrestamo'
+import PrestamoDetalle from '@/app/prestamos/PrestamoDetalle'
+import Pagos from '@/app/pagos/Pagos'
 import { RequireAuth, RequireOrganization, RequirePlatformAdmin } from '@/components/RouteGuard'
 
-// Placeholder temporal — se reemplaza en Fase 3+ por las páginas reales
+// Placeholder temporal — se reemplaza en fases siguientes por las páginas reales
 function Placeholder({ title }: { title: string }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-surface">
@@ -64,31 +72,66 @@ export default function App() {
         path="/dashboard"
         element={
           <RequireOrganization>
-            <Placeholder title="Dashboard" />
+            <Dashboard />
           </RequireOrganization>
         }
       />
+
       <Route
         path="/clientes"
         element={
           <RequireOrganization>
-            <Placeholder title="Clientes" />
+            <Clientes />
           </RequireOrganization>
         }
       />
+      <Route
+        path="/clientes/nuevo"
+        element={
+          <RequireOrganization>
+            <NuevoCliente />
+          </RequireOrganization>
+        }
+      />
+      <Route
+        path="/clientes/:id"
+        element={
+          <RequireOrganization>
+            <ClienteDetalle />
+          </RequireOrganization>
+        }
+      />
+
       <Route
         path="/prestamos"
         element={
           <RequireOrganization>
-            <Placeholder title="Préstamos" />
+            <Prestamos />
           </RequireOrganization>
         }
       />
       <Route
+        path="/prestamos/nuevo"
+        element={
+          <RequireOrganization>
+            <NuevoPrestamo />
+          </RequireOrganization>
+        }
+      />
+      <Route
+        path="/prestamos/:id"
+        element={
+          <RequireOrganization>
+            <PrestamoDetalle />
+          </RequireOrganization>
+        }
+      />
+
+      <Route
         path="/pagos"
         element={
           <RequireOrganization>
-            <Placeholder title="Pagos" />
+            <Pagos />
           </RequireOrganization>
         }
       />

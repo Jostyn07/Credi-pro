@@ -40,6 +40,61 @@ export type Database = {
         Args: { p_plan_key: string }
         Returns: Record<string, unknown>
       }
+      preview_amortization: {
+        Args: {
+          p_principal: number
+          p_interest_rate: number
+          p_modality: string
+          p_term_months: number
+          p_first_payment_date: string
+        }
+        Returns: Record<string, unknown>[]
+      }
+      create_loan: {
+        Args: {
+          p_client_id: string
+          p_principal: number
+          p_interest_rate: number
+          p_interest_modality: string
+          p_term_months: number
+          p_disbursement_date: string
+          p_first_payment_date: string
+          p_payment_day: number
+          p_grace_days?: number
+          p_late_fee_rate?: number
+          p_disbursement_method?: string | null
+        }
+        Returns: Record<string, unknown>
+      }
+      preview_payment_allocation: {
+        Args: {
+          p_loan_id: string
+          p_amount: number
+          p_payment_date?: string
+        }
+        Returns: Record<string, unknown>[]
+      }
+      register_payment: {
+        Args: {
+          p_loan_id: string
+          p_amount: number
+          p_payment_date?: string
+          p_payment_method?: string | null
+          p_reference?: string | null
+          p_notes?: string | null
+          p_prepayment_strategy?: string | null
+        }
+        Returns: Record<string, unknown>
+      }
+      liquidate_loan: {
+        Args: {
+          p_loan_id: string
+          p_payment_date?: string
+          p_payment_method?: string | null
+          p_reference?: string | null
+        }
+        Returns: Record<string, unknown>
+      }
     }
     Enums: Record<string, any>
   }
