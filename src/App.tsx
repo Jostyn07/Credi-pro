@@ -5,6 +5,7 @@ import Registro from '@/app/auth/Registro'
 import RecuperarContrasena from '@/app/auth/RecuperarContrasena'
 import CrearOrganizacion from '@/app/onboarding/CrearOrganizacion'
 import SeleccionarPlan from '@/app/onboarding/SeleccionarPlan'
+import Suscripcion from '@/app/organizacion/Suscripcion'
 import { RequireAuth, RequireOrganization, RequirePlatformAdmin } from '@/components/RouteGuard'
 
 // Placeholder temporal — se reemplaza en Fase 3+ por las páginas reales
@@ -79,6 +80,15 @@ export default function App() {
         element={
           <RequireOrganization>
             <Placeholder title="Pagos" />
+          </RequireOrganization>
+        }
+      />
+
+      <Route
+        path="/suscripcion"
+        element={
+          <RequireOrganization>
+            <Suscripcion />
           </RequireOrganization>
         }
       />

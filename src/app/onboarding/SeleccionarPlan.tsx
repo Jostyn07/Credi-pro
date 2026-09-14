@@ -1,23 +1,70 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { PlanCard } from '@/components/ui/PlanCard'
+import { getPlans, startSubscription, type Plan } from '@/services/subscriptions'
 
-// Fase 2 reemplaza esto por la selección real de plan + trial de 15 días + Wompi.
-// Por ahora deja pasar directo al dashboard para poder probar el flujo completo.
 export default function SeleccionarPlan() {
   const navigate = useNavigate()
+  const [plans, setPlans] = useState<Plan[]>([])
+  const [loadingPlans, setLoadingPlans] = useState(true)
+  const [selecting, setSelecting] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    getPlans()
+      .then(setPlans)
+      .catch((err) => setError(err instanceof Error ? err.message : 'No se pudieron cargar los planes'))
+      .finally(() => setLoadingPlans(false))
+  }, [])
+
+  async function handleSelect(planKey: string) {
+    setError(null)
+    setSelecting(planKey)
+    try {
+      await startSubscription(planKey)
+      navigate('/dashboard')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo iniciar la suscripción')
+    } finally {
+      setSelecting(null)
+    }
+  }
+
+  if (loadingPlans) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+      </div>
+    )
+  }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface px-4">
-      <Card className="w-full max-w-md text-center">
-        <h1 className="mb-1 text-xl font-semibold text-primary">Organización creada</h1>
-        <p className="mb-6 text-sm text-slate-500">
-          La selección de plan y el trial de 15 días se implementan en la Fase 2 (SaaS + Wompi).
+    <div className="min-h-screen bg-surface px-4 py-16">
+      <div className="mx-auto max-w-5xl text-center">
+        <h1 className="text-2xl font-semibold text-primary">Elige tu plan</h1>
+        <p className="mt-2 text-sm text-slate-500">
+          15 días gratis en cualquier plan. Sin tarjeta inicial. Cancela cuando quieras.
         </p>
-        <Button className="w-full" onClick={() => navigate('/dashboard')}>
-          Ir al dashboard
-        </Button>
-      </Card>
+
+        {error && (
+          <Card className="mx-auto mt-6 max-w-md border-status-danger/30 bg-red-50 text-status-danger">
+            {error}
+          </Card>
+        )}
+
+        <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {plans.map((plan) => (
+            <PlanCard
+              key={plan.key}
+              plan={plan}
+              highlighted={plan.key === 'profesional'}
+              loading={selecting === plan.key}
+              onSelect={handleSelect}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
