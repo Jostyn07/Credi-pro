@@ -2,7 +2,10 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Card } from '@/components/ui/Card'
+import { PasswordInput } from '@/components/ui/PasswordInput'
+import { Logo } from '@/components/ui/Logo'
+import { AuthFooter } from '@/components/ui/AuthFooter'
+import { Stepper, ONBOARDING_STEPS } from '@/components/ui/Stepper'
 import { signUp } from '@/services/auth'
 
 export default function Registro() {
@@ -11,6 +14,7 @@ export default function Registro() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -18,6 +22,10 @@ export default function Registro() {
     e.preventDefault()
     setError(null)
 
+    if (!acceptedTerms) {
+      setError('Debes aceptar los Términos y Condiciones para continuar')
+      return
+    }
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden')
       return
@@ -40,60 +48,99 @@ export default function Registro() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface px-4">
-      <Card className="w-full max-w-sm">
-        <h1 className="mb-1 text-xl font-semibold text-primary">Crear cuenta</h1>
-        <p className="mb-6 text-sm text-slate-500">Empieza tu prueba gratis de 15 días</p>
+    <div className="flex min-h-screen flex-col bg-surface">
+      <div className="flex flex-1 items-center justify-center p-4">
+        <div className="w-full max-w-lg rounded-card bg-surface-card p-8 shadow-sm sm:p-10">
+          <div className="mb-6 flex items-center justify-between">
+            <Logo />
+            <select
+              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-600"
+              defaultValue="es"
+              aria-label="Idioma"
+            >
+              <option value="es">🌐 ES</option>
+            </select>
+          </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <Input
-            id="fullName"
-            label="Nombre"
-            placeholder="Tu nombre completo"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            required
-          />
-          <Input
-            id="email"
-            type="email"
-            label="Correo"
-            placeholder="tu@empresa.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <Input
-            id="password"
-            type="password"
-            label="Contraseña"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          <Input
-            id="confirmPassword"
-            type="password"
-            label="Confirmar contraseña"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-          />
+          <h1 className="text-2xl font-semibold text-primary">Crea tu cuenta</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Comienza a gestionar tu cartera con CrediPro. 15 días gratis, sin compromiso.
+          </p>
 
-          {error && <p className="text-sm text-status-danger">{error}</p>}
+          <div className="mt-8">
+            <Stepper steps={ONBOARDING_STEPS} currentStep={1} />
+          </div>
 
-          <Button type="submit" loading={loading} className="w-full">
-            Crear cuenta
-          </Button>
-        </form>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <Input
+              id="fullName"
+              label="Nombre completo"
+              placeholder="Juan Pérez"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+            />
+            <Input
+              id="email"
+              type="email"
+              label="Correo electrónico"
+              placeholder="tu@empresa.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <PasswordInput
+              id="password"
+              label="Contraseña"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <PasswordInput
+              id="confirmPassword"
+              label="Confirmar contraseña"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+            />
 
-        <p className="mt-6 text-center text-sm text-slate-500">
-          ¿Ya tienes cuenta?{' '}
-          <Link to="/login" className="text-accent hover:underline">
-            Inicia sesión
-          </Link>
-        </p>
-      </Card>
+            <label className="flex items-start gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-accent focus:ring-accent/30"
+              />
+              <span>
+                Acepto los{' '}
+                <Link to="/terminos" className="text-accent hover:underline">
+                  Términos y Condiciones
+                </Link>{' '}
+                y la{' '}
+                <Link to="/privacidad" className="text-accent hover:underline">
+                  Política de Privacidad
+                </Link>{' '}
+                de CrediPro.
+              </span>
+            </label>
+
+            {error && <p className="text-sm text-status-danger">{error}</p>}
+
+            <Button type="submit" loading={loading} className="w-full">
+              Crear cuenta →
+            </Button>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-slate-500">
+            ¿Ya tienes una cuenta?{' '}
+            <Link to="/login" className="font-medium text-accent hover:underline">
+              Inicia sesión
+            </Link>
+          </p>
+        </div>
+      </div>
+
+      <AuthFooter />
     </div>
   )
 }

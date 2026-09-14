@@ -25,6 +25,16 @@ export async function signInWithGoogle() {
   return data
 }
 
+// Supabase expone Microsoft (Azure AD) como proveedor "azure"
+export async function signInWithMicrosoft() {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'azure',
+    options: { redirectTo: `${window.location.origin}/dashboard` },
+  })
+  if (error) throw error
+  return data
+}
+
 export async function requestPasswordReset(email: string) {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${window.location.origin}/restablecer-contrasena`,

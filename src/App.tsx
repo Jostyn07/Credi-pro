@@ -5,6 +5,7 @@ import Registro from '@/app/auth/Registro'
 import RecuperarContrasena from '@/app/auth/RecuperarContrasena'
 import CrearOrganizacion from '@/app/onboarding/CrearOrganizacion'
 import SeleccionarPlan from '@/app/onboarding/SeleccionarPlan'
+import Listo from '@/app/onboarding/Listo'
 import Suscripcion from '@/app/organizacion/Suscripcion'
 import { RequireAuth, RequireOrganization, RequirePlatformAdmin } from '@/components/RouteGuard'
 
@@ -46,6 +47,14 @@ export default function App() {
         element={
           <RequireAuth>
             <SeleccionarPlan />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/onboarding/listo"
+        element={
+          <RequireAuth>
+            <Listo />
           </RequireAuth>
         }
       />

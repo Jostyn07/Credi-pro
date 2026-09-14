@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
+import { Logo } from '@/components/ui/Logo'
 import { PlanCard } from '@/components/ui/PlanCard'
+import { Stepper, ONBOARDING_STEPS } from '@/components/ui/Stepper'
+import { AuthFooter } from '@/components/ui/AuthFooter'
 import { getPlans, startSubscription, type Plan } from '@/services/subscriptions'
 
 export default function SeleccionarPlan() {
@@ -23,7 +26,7 @@ export default function SeleccionarPlan() {
     setSelecting(planKey)
     try {
       await startSubscription(planKey)
-      navigate('/dashboard')
+      navigate('/onboarding/listo')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo iniciar la suscripción')
     } finally {
@@ -31,40 +34,52 @@ export default function SeleccionarPlan() {
     }
   }
 
-  if (loadingPlans) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-surface">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-      </div>
-    )
-  }
-
   return (
-    <div className="min-h-screen bg-surface px-4 py-16">
-      <div className="mx-auto max-w-5xl text-center">
-        <h1 className="text-2xl font-semibold text-primary">Elige tu plan</h1>
-        <p className="mt-2 text-sm text-slate-500">
-          15 días gratis en cualquier plan. Sin tarjeta inicial. Cancela cuando quieras.
-        </p>
+    <div className="flex min-h-screen flex-col bg-surface">
+      <div className="flex-1 px-4 py-10">
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-6 flex justify-center">
+            <Logo />
+          </div>
 
-        {error && (
-          <Card className="mx-auto mt-6 max-w-md border-status-danger/30 bg-red-50 text-status-danger">
-            {error}
-          </Card>
-        )}
+          <div className="mx-auto mb-8 max-w-lg">
+            <Stepper steps={ONBOARDING_STEPS} currentStep={3} />
+          </div>
 
-        <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {plans.map((plan) => (
-            <PlanCard
-              key={plan.key}
-              plan={plan}
-              highlighted={plan.key === 'profesional'}
-              loading={selecting === plan.key}
-              onSelect={handleSelect}
-            />
-          ))}
+          <div className="text-center">
+            <h1 className="text-2xl font-semibold text-primary">Elige tu plan</h1>
+            <p className="mt-2 text-sm text-slate-500">
+              15 días gratis en cualquier plan. Sin tarjeta inicial. Cancela cuando quieras.
+            </p>
+          </div>
+
+          {error && (
+            <Card className="mx-auto mt-6 max-w-md border-status-danger/30 bg-red-50 text-status-danger">
+              {error}
+            </Card>
+          )}
+
+          {loadingPlans ? (
+            <div className="mt-16 flex justify-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+            </div>
+          ) : (
+            <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+              {plans.map((plan) => (
+                <PlanCard
+                  key={plan.key}
+                  plan={plan}
+                  highlighted={plan.key === 'profesional'}
+                  loading={selecting === plan.key}
+                  onSelect={handleSelect}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
+
+      <AuthFooter />
     </div>
   )
 }
