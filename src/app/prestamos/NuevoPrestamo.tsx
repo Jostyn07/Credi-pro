@@ -1,13 +1,23 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Search, Plus, Phone, Wallet2, ChevronDown, ChevronUp } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
 import { Stepper } from '@/components/ui/Stepper'
 import { AmortizationTable } from '@/components/ui/AmortizationTable'
-import { getClients, type Client } from '@/services/clients'
+import { cn } from '@/utils/cn'
+import { computeClientRisk, type ClientRisk } from '@/utils/clientRisk'
+import {
+  getClients,
+  getClientProfileSummary,
+  type Client,
+  type ClientProfileSummary,
+} from '@/services/clients'
 import { createLoan, previewAmortization, type AmortizationRow, type InterestModality } from '@/services/loans'
 import { generateContract } from '@/services/contracts'
+import { QuickNewClientModal } from './QuickNewClientModal'
 
 const STEPS = [{ label: 'Cliente' }, { label: 'Condiciones' }, { label: 'Calendario' }, { label: 'Resumen' }]
 
@@ -17,10 +27,26 @@ const modalityLabels: Record<InterestModality, string> = {
   fijo: 'Cuota fija (sistema francés)',
 }
 
+const riskScoreClasses: Record<ClientRisk['tone'], string> = {
+  neutral: 'bg-neutral-100 text-neutral-600',
+  success: 'bg-success-100 text-success-700',
+  warning: 'bg-warning-100 text-warning-700',
+  danger: 'bg-danger-100 text-danger-700',
+}
+
 function formatCOP(value: number) {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(
     value,
   )
+}
+
+function initials(fullName: string) {
+  return fullName
+    .split(' ')
+    .slice(0, 2)
+    .map((n) => n.charAt(0))
+    .join('')
+    .toUpperCase()
 }
 
 export default function NuevoPrestamo() {
@@ -31,6 +57,11 @@ export default function NuevoPrestamo() {
   const [step, setStep] = useState(1)
   const [clients, setClients] = useState<Client[]>([])
   const [clientId, setClientId] = useState(preselectedClientId ?? '')
+  const [clientSearch, setClientSearch] = useState('')
+  const [showNewClientModal, setShowNewClientModal] = useState(false)
+  const [showMoreClientInfo, setShowMoreClientInfo] = useState(false)
+  const [clientSummary, setClientSummary] = useState<ClientProfileSummary | null>(null)
+  const [loadingClientSummary, setLoadingClientSummary] = useState(false)
 
   const [principal, setPrincipal] = useState(5000000)
   const [interestRate, setInterestRate] = useState(5)
@@ -52,6 +83,37 @@ export default function NuevoPrestamo() {
   }, [])
 
   const selectedClient = clients.find((c) => c.id === clientId)
+
+  // Ficha y estadísticas del cliente seleccionado: se recalculan cada vez que
+  // cambia clientId, igual que en ClientDetailPanel — nada queda cacheado.
+  useEffect(() => {
+    if (!clientId) {
+      setClientSummary(null)
+      return
+    }
+    setLoadingClientSummary(true)
+    getClientProfileSummary(clientId)
+      .then(setClientSummary)
+      .finally(() => setLoadingClientSummary(false))
+  }, [clientId])
+
+  const clientSearchNormalized = clientSearch.trim().toLowerCase()
+  const filteredClients = clients.filter((c) => {
+    if (!clientSearchNormalized) return true
+    return (
+      c.full_name.toLowerCase().includes(clientSearchNormalized) ||
+      (c.identification ?? '').toLowerCase().includes(clientSearchNormalized) ||
+      (c.phone ?? '').toLowerCase().includes(clientSearchNormalized)
+    )
+  })
+
+  const risk = clientSummary ? computeClientRisk(clientSummary) : null
+
+  function handleClientCreated(client: Client) {
+    setClients((prev) => [client, ...prev])
+    setClientId(client.id)
+    setShowNewClientModal(false)
+  }
 
   async function handleGoToCalendar() {
     setError(null)
@@ -116,22 +178,170 @@ export default function NuevoPrestamo() {
           {step === 1 && (
             <div className="flex flex-col gap-4">
               <label className="text-sm font-medium text-primary">Seleccionar cliente</label>
-              <select
-                className="h-10 rounded-lg border border-neutral-300 px-3 text-sm text-primary"
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-              >
-                <option value="">Selecciona un cliente...</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.full_name} {c.identification ? `— ${c.identification}` : ''}
-                  </option>
-                ))}
-              </select>
 
-              <Button disabled={!clientId} onClick={() => setStep(2)} className="mt-2 w-full">
-                Siguiente
-              </Button>
+              {!selectedClient ? (
+                <>
+                  <div className="flex gap-3">
+                    <div className="relative flex-1">
+                      <Search
+                        size={16}
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
+                      />
+                      <input
+                        value={clientSearch}
+                        onChange={(e) => setClientSearch(e.target.value)}
+                        placeholder="Buscar cliente por nombre o identificación..."
+                        className="h-10 w-full rounded-lg border border-neutral-300 bg-white pl-9 pr-3 text-sm text-primary placeholder:text-neutral-400 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+                      />
+                    </div>
+                    <Button type="button" variant="secondary" onClick={() => setShowNewClientModal(true)}>
+                      <Plus size={16} /> Nuevo cliente
+                    </Button>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    {filteredClients.length === 0 ? (
+                      <p className="py-6 text-center text-sm text-neutral-400">
+                        {clientSearch
+                          ? 'No se encontraron clientes con ese criterio.'
+                          : 'Aún no tienes clientes registrados.'}
+                      </p>
+                    ) : (
+                      filteredClients.slice(0, 8).map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => setClientId(c.id)}
+                          className="flex items-center justify-between rounded-lg border border-neutral-200 px-4 py-3 text-left transition-colors hover:border-accent hover:bg-accent/5"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-900 text-xs font-semibold text-white">
+                              {initials(c.full_name)}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-primary">{c.full_name}</p>
+                              <p className="text-xs text-neutral-400">
+                                {[c.identification, c.phone].filter(Boolean).join(' · ') || 'Sin datos adicionales'}
+                              </p>
+                            </div>
+                          </div>
+                          <Badge tone={c.status === 'active' ? 'success' : 'neutral'}>
+                            {c.status === 'active' ? 'Activo' : 'Inactivo'}
+                          </Badge>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-lg border border-neutral-200 p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-900 text-sm font-semibold text-white">
+                        {initials(selectedClient.full_name)}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-primary">{selectedClient.full_name}</p>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-neutral-500">
+                          {selectedClient.identification && (
+                            <span className="flex items-center gap-1">
+                              <Wallet2 size={12} /> {selectedClient.identification}
+                            </span>
+                          )}
+                          {selectedClient.phone && (
+                            <span className="flex items-center gap-1">
+                              <Phone size={12} /> {selectedClient.phone}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <Badge tone={selectedClient.status === 'active' ? 'success' : 'neutral'}>
+                      {selectedClient.status === 'active' ? 'Activo' : 'Inactivo'}
+                    </Badge>
+                  </div>
+
+                  {loadingClientSummary || !clientSummary || !risk ? (
+                    <div className="mt-4 flex justify-center py-4">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mt-4 flex items-center gap-2 rounded-lg bg-neutral-50 p-3">
+                        <span
+                          className={cn(
+                            'rounded-md px-2 py-1 text-sm font-semibold',
+                            riskScoreClasses[risk.tone],
+                          )}
+                        >
+                          {risk.level === 'sin_historial' ? '—' : risk.score}
+                        </span>
+                        <Badge tone={risk.tone}>{risk.label}</Badge>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-4 gap-3 text-center">
+                        <div>
+                          <p className="text-xs text-neutral-400">Préstamos</p>
+                          <p className="text-sm font-semibold text-primary">{clientSummary.loansTotal}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-neutral-400">Liquidados</p>
+                          <p className="text-sm font-semibold text-primary">{clientSummary.loansLiquidated}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-neutral-400">Activos</p>
+                          <p className="text-sm font-semibold text-primary">{clientSummary.loansActive}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-neutral-400">Mora histórica</p>
+                          <p className="text-sm font-semibold text-primary">{clientSummary.loansInArrears}</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setShowMoreClientInfo((v) => !v)}
+                    className="mt-4 flex items-center gap-1 text-xs font-medium text-accent"
+                  >
+                    {showMoreClientInfo ? <ChevronUp size={14} /> : <ChevronDown size={14} />} Información adicional
+                  </button>
+                  {showMoreClientInfo && (
+                    <div className="mt-2 flex flex-col gap-1 text-xs text-neutral-500">
+                      {selectedClient.email && <p>Correo: {selectedClient.email}</p>}
+                      {(selectedClient.address || selectedClient.city) && (
+                        <p>Dirección: {[selectedClient.address, selectedClient.city].filter(Boolean).join(', ')}</p>
+                      )}
+                      {selectedClient.occupation && <p>Ocupación: {selectedClient.occupation}</p>}
+                      {!selectedClient.email &&
+                        !selectedClient.address &&
+                        !selectedClient.city &&
+                        !selectedClient.occupation && <p>Sin información adicional registrada.</p>}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setClientId('')
+                      setShowMoreClientInfo(false)
+                    }}
+                    className="mt-4 text-xs font-medium text-accent hover:underline"
+                  >
+                    Cambiar cliente
+                  </button>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <Button type="button" variant="secondary" onClick={() => navigate('/prestamos')}>
+                  Cancelar
+                </Button>
+                <Button disabled={!clientId} onClick={() => setStep(2)} className="flex-1">
+                  Siguiente →
+                </Button>
+              </div>
             </div>
           )}
 
@@ -295,6 +505,12 @@ export default function NuevoPrestamo() {
           )}
         </Card>
       </div>
+
+      <QuickNewClientModal
+        open={showNewClientModal}
+        onClose={() => setShowNewClientModal(false)}
+        onCreated={handleClientCreated}
+      />
     </div>
   )
 }
