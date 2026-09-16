@@ -95,6 +95,50 @@ export type Database = {
         }
         Returns: Record<string, unknown>
       }
+      account_balance_asof: {
+        Args: { p_account_id: string; p_as_of_date: string }
+        Returns: number
+      }
+      register_cash_movement: {
+        Args: {
+          p_account_id: string
+          p_movement_type: string
+          p_amount: number
+          p_description?: string | null
+          p_movement_date?: string
+          p_loan_id?: string | null
+          p_payment_id?: string | null
+        }
+        Returns: Record<string, unknown>
+      }
+      register_cash_transfer: {
+        Args: {
+          p_from_account_id: string
+          p_to_account_id: string
+          p_amount: number
+          p_description?: string | null
+          p_movement_date?: string
+        }
+        Returns: undefined
+      }
+      register_expense: {
+        Args: {
+          p_account_id: string
+          p_category: string
+          p_amount: number
+          p_description?: string | null
+          p_expense_date?: string
+        }
+        Returns: Record<string, unknown>
+      }
+      close_cash_register: {
+        Args: { p_account_id: string; p_closure_date?: string }
+        Returns: Record<string, unknown>
+      }
+      generate_contract: {
+        Args: { p_loan_id: string }
+        Returns: Record<string, unknown>
+      }
     }
     Enums: Record<string, any>
   }
