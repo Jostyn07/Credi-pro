@@ -51,3 +51,18 @@ export async function requestPasswordReset(email: string) {
   })
   if (error) throw error
 }
+
+// Se usa cuando signIn() falla con error.code === 'email_not_confirmed': le
+// permite al usuario pedir un nuevo correo de confirmación sin tener que
+// registrarse de nuevo. Mismo emailRedirectTo que signUp(), por la misma
+// razón (ver nota ahí arriba).
+export async function resendSignupConfirmation(email: string) {
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email,
+    options: {
+      emailRedirectTo: `${window.location.origin}/auth/callback`,
+    },
+  })
+  if (error) throw error
+}
