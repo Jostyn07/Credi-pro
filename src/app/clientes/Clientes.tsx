@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Users, UserCheck, AlertTriangle, UserPlus, TrendingUp, TrendingDown } from 'lucide-react'
+import { Users, UserCheck, AlertTriangle, UserPlus, TrendingUp, TrendingDown, Search } from 'lucide-react'
 import { Table } from '@/components/ui/Table'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { getClients, getClientStats, type Client, type ClientStats } from '@/services/clients'
+import { supabase } from '@/lib/supabaseClient'
 import type { StatWithChange } from '@/services/dashboard'
 import { cn } from '@/utils/cn'
 
@@ -53,19 +54,77 @@ function StatCard({ label, stat, icon: Icon, tone }: StatCardProps) {
   )
 }
 
+const dateRangeOptions = [
+  { value: 'todas', label: 'Todas' },
+  { value: 'mes', label: 'Este mes' },
+  { value: 'trimestre', label: 'Últimos 3 meses' },
+  { value: 'anio', label: 'Este año' },
+]
+
 export default function Clientes() {
   const [clients, setClients] = useState<Client[]>([])
   const [stats, setStats] = useState<ClientStats | null>(null)
+  const [clientIdsWithLoans, setClientIdsWithLoans] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
 
+  const [search, setSearch] = useState('')
+  const [filterEstado, setFilterEstado] = useState('todos')
+  const [filterCiudad, setFilterCiudad] = useState('todas')
+  const [filterPrestamos, setFilterPrestamos] = useState('todos')
+  const [filterFecha, setFilterFecha] = useState('todas')
+
   useEffect(() => {
-    Promise.all([getClients(), getClientStats()])
-      .then(([c, s]) => {
+    Promise.all([getClients(), getClientStats(), supabase.from('loans').select('client_id')])
+      .then(([c, s, loansResult]) => {
         setClients(c)
         setStats(s)
+        setClientIdsWithLoans(new Set(((loansResult.data ?? []) as any[]).map((l) => l.client_id)))
       })
       .finally(() => setLoading(false))
   }, [])
+
+  const ciudades = useMemo(
+    () => Array.from(new Set(clients.map((c) => c.city).filter(Boolean))).sort() as string[],
+    [clients],
+  )
+
+  const filteredClients = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const now = new Date()
+
+    return clients.filter((c) => {
+      if (q) {
+        const matches =
+          c.full_name.toLowerCase().includes(q) ||
+          (c.identification ?? '').toLowerCase().includes(q) ||
+          (c.phone ?? '').toLowerCase().includes(q)
+        if (!matches) return false
+      }
+      if (filterEstado !== 'todos' && c.status !== filterEstado) return false
+      if (filterCiudad !== 'todas' && c.city !== filterCiudad) return false
+      if (filterPrestamos !== 'todos') {
+        const hasLoans = clientIdsWithLoans.has(c.id)
+        if (filterPrestamos === 'si' && !hasLoans) return false
+        if (filterPrestamos === 'no' && hasLoans) return false
+      }
+      if (filterFecha !== 'todas') {
+        const created = new Date(c.created_at)
+        const monthsDiff = (now.getFullYear() - created.getFullYear()) * 12 + (now.getMonth() - created.getMonth())
+        if (filterFecha === 'mes' && monthsDiff > 0) return false
+        if (filterFecha === 'trimestre' && monthsDiff > 2) return false
+        if (filterFecha === 'anio' && created.getFullYear() !== now.getFullYear()) return false
+      }
+      return true
+    })
+  }, [clients, search, filterEstado, filterCiudad, filterPrestamos, filterFecha, clientIdsWithLoans])
+
+  function limpiarFiltros() {
+    setSearch('')
+    setFilterEstado('todos')
+    setFilterCiudad('todas')
+    setFilterPrestamos('todos')
+    setFilterFecha('todas')
+  }
 
   return (
     <div className="min-h-screen bg-surface p-6">
@@ -92,6 +151,85 @@ export default function Clientes() {
             <StatCard label="Nuevos este mes" stat={stats.newThisMonth} icon={UserPlus} tone="primary" />
           </div>
 
+          <Card className="mb-4">
+            <div className="flex gap-3">
+              <div className="relative flex-1">
+                <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar por nombre, identificación o teléfono..."
+                  className="h-10 w-full rounded-lg border border-neutral-300 bg-white pl-9 pr-3 text-sm text-primary placeholder:text-neutral-400 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+                />
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div>
+                <label className="text-xs font-medium text-neutral-500">Estado</label>
+                <select
+                  className="mt-1 h-9 w-full rounded-lg border border-neutral-300 px-2 text-sm text-primary"
+                  value={filterEstado}
+                  onChange={(e) => setFilterEstado(e.target.value)}
+                >
+                  <option value="todos">Todos</option>
+                  <option value="active">Activo</option>
+                  <option value="inactive">Inactivo</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-neutral-500">Ciudad</label>
+                <select
+                  className="mt-1 h-9 w-full rounded-lg border border-neutral-300 px-2 text-sm text-primary"
+                  value={filterCiudad}
+                  onChange={(e) => setFilterCiudad(e.target.value)}
+                >
+                  <option value="todas">Todas</option>
+                  {ciudades.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-neutral-500">Tiene préstamos</label>
+                <select
+                  className="mt-1 h-9 w-full rounded-lg border border-neutral-300 px-2 text-sm text-primary"
+                  value={filterPrestamos}
+                  onChange={(e) => setFilterPrestamos(e.target.value)}
+                >
+                  <option value="todos">Todos</option>
+                  <option value="si">Sí</option>
+                  <option value="no">No</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-neutral-500">Fecha de registro</label>
+                <select
+                  className="mt-1 h-9 w-full rounded-lg border border-neutral-300 px-2 text-sm text-primary"
+                  value={filterFecha}
+                  onChange={(e) => setFilterFecha(e.target.value)}
+                >
+                  {dateRangeOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-3 flex items-center justify-between">
+              <p className="text-xs text-neutral-400">
+                {filteredClients.length} de {clients.length} clientes
+              </p>
+              <button onClick={limpiarFiltros} className="text-xs font-medium text-accent hover:underline">
+                Limpiar filtros
+              </button>
+            </div>
+          </Card>
+
           <Table
             columns={[
               { key: 'full_name', header: 'Nombre' },
@@ -117,9 +255,9 @@ export default function Clientes() {
                 ),
               },
             ]}
-            data={clients}
+            data={filteredClients}
             rowKey={(row) => row.id}
-            emptyMessage="Aún no tienes clientes registrados."
+            emptyMessage="Ningún cliente coincide con los filtros."
           />
         </>
       )}
