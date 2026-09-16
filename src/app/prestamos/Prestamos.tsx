@@ -28,8 +28,8 @@ export default function Prestamos() {
     <div className="min-h-screen bg-surface p-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-primary">Préstamos</h1>
-          <p className="text-sm text-slate-500">Todos los préstamos de tu cartera</p>
+          <h1 className="text-2xl font-bold text-neutral-950">Préstamos</h1>
+          <p className="text-sm text-neutral-500">Todos los préstamos de tu cartera</p>
         </div>
         <Link to="/prestamos/nuevo">
           <Button>+ Nuevo préstamo</Button>

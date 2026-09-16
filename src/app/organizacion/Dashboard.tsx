@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Wallet, PiggyBank, TrendingUp, AlertTriangle, Users, Landmark } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
-import { TrialBanner } from '@/components/ui/TrialBanner'
 import { getDashboardStats, type DashboardStats } from '@/services/dashboard'
+import { cn } from '@/utils/cn'
 
 function formatCOP(value: number) {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(
@@ -10,13 +11,31 @@ function formatCOP(value: number) {
   )
 }
 
-function StatCard({ label, value, tone }: { label: string; value: string; tone?: 'danger' }) {
+interface StatCardProps {
+  label: string
+  value: string
+  icon: typeof Wallet
+  tone: 'primary' | 'warning' | 'success' | 'danger' | 'info'
+}
+
+const toneStyles: Record<StatCardProps['tone'], string> = {
+  primary: 'bg-primary-100 text-primary-600',
+  warning: 'bg-warning-100 text-warning-600',
+  success: 'bg-success-100 text-success-600',
+  danger: 'bg-danger-100 text-danger-600',
+  info: 'bg-info-100 text-info-700',
+}
+
+function StatCard({ label, value, icon: Icon, tone }: StatCardProps) {
   return (
-    <Card>
-      <p className="text-sm text-slate-500">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold ${tone === 'danger' ? 'text-status-danger' : 'text-primary'}`}>
-        {value}
-      </p>
+    <Card className="flex items-center gap-4">
+      <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-lg', toneStyles[tone])}>
+        <Icon size={20} />
+      </div>
+      <div>
+        <p className="text-sm text-neutral-500">{label}</p>
+        <p className="mt-0.5 text-xl font-bold text-neutral-950">{value}</p>
+      </div>
     </Card>
   )
 }
@@ -33,13 +52,11 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-surface">
-      <TrialBanner />
-
       <div className="p-6">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-primary">Dashboard</h1>
-            <p className="text-sm text-slate-500">Resumen general de tu cartera</p>
+            <h1 className="text-2xl font-bold text-neutral-950">Dashboard</h1>
+            <p className="text-sm text-neutral-500">Resumen general de tu cartera</p>
           </div>
           <div className="flex gap-3">
             <Link to="/clientes" className="text-sm font-medium text-accent hover:underline">
@@ -58,30 +75,38 @@ export default function Dashboard() {
         ) : (
           <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard label="Clientes" value={stats.totalClients.toString()} />
-              <StatCard label="Préstamos activos" value={stats.activeLoans.toString()} />
-              <StatCard label="Capital prestado" value={formatCOP(stats.capitalLent)} />
-              <StatCard label="Capital pendiente" value={formatCOP(stats.capitalPending)} />
+              <StatCard label="Clientes" value={stats.totalClients.toString()} icon={Users} tone="info" />
+              <StatCard label="Préstamos activos" value={stats.activeLoans.toString()} icon={Landmark} tone="primary" />
+              <StatCard label="Capital prestado" value={formatCOP(stats.capitalLent)} icon={Wallet} tone="primary" />
+              <StatCard label="Capital pendiente" value={formatCOP(stats.capitalPending)} icon={PiggyBank} tone="warning" />
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-              <StatCard label="Cartera vencida" value={formatCOP(stats.overdueBalance)} tone="danger" />
+              <StatCard
+                label="Cartera vencida"
+                value={formatCOP(stats.overdueBalance)}
+                icon={AlertTriangle}
+                tone="danger"
+              />
 
               <Card className="lg:col-span-2">
-                <p className="mb-3 text-sm font-medium text-primary">Próximos pagos (7 días)</p>
+                <div className="mb-3 flex items-center gap-2">
+                  <TrendingUp size={16} className="text-accent" />
+                  <p className="text-sm font-semibold text-neutral-950">Próximos pagos (7 días)</p>
+                </div>
                 {stats.upcomingPayments.length === 0 ? (
-                  <p className="text-sm text-slate-400">No hay pagos programados en los próximos 7 días.</p>
+                  <p className="text-sm text-neutral-400">No hay pagos programados en los próximos 7 días.</p>
                 ) : (
-                  <ul className="divide-y divide-slate-100">
+                  <ul className="divide-y divide-neutral-100">
                     {stats.upcomingPayments.map((p, i) => (
                       <li key={i} className="flex items-center justify-between py-2 text-sm">
                         <div>
-                          <p className="font-medium text-primary">{p.clientName}</p>
-                          <p className="text-xs text-slate-400">
+                          <p className="font-medium text-neutral-950">{p.clientName}</p>
+                          <p className="text-xs text-neutral-400">
                             {p.loanNumber} · {new Date(p.dueDate).toLocaleDateString('es-CO')}
                           </p>
                         </div>
-                        <p className="font-medium text-primary">{formatCOP(p.total)}</p>
+                        <p className="font-semibold text-neutral-950">{formatCOP(p.total)}</p>
                       </li>
                     ))}
                   </ul>

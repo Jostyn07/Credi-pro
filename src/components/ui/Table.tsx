@@ -18,16 +18,16 @@ interface TableProps<T> {
 export function Table<T>({ columns, data, rowKey, emptyMessage = 'Sin registros' }: TableProps<T>) {
   if (data.length === 0) {
     return (
-      <div className="flex h-32 items-center justify-center rounded-card border border-dashed border-slate-200 text-sm text-slate-400">
+      <div className="flex h-32 items-center justify-center rounded-card border border-dashed border-neutral-300 text-sm text-neutral-400">
         {emptyMessage}
       </div>
     )
   }
 
   return (
-    <div className="overflow-x-auto rounded-card border border-slate-100">
-      <table className="w-full text-left text-sm">
-        <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+    <div className="overflow-x-auto rounded-card border border-neutral-200">
+      <table className="w-full min-w-[640px] text-left text-sm">
+        <thead className="bg-neutral-100 text-xs uppercase text-neutral-500">
           <tr>
             {columns.map((col) => (
               <th key={col.key} className={cn('px-4 py-3 font-medium', col.className)}>
@@ -36,9 +36,9 @@ export function Table<T>({ columns, data, rowKey, emptyMessage = 'Sin registros'
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-neutral-200">
           {data.map((row) => (
-            <tr key={rowKey(row)} className="hover:bg-slate-50">
+            <tr key={rowKey(row)} className="hover:bg-neutral-100">
               {columns.map((col) => (
                 <td key={col.key} className={cn('px-4 py-3 text-primary', col.className)}>
                   {col.render ? col.render(row) : String((row as Record<string, unknown>)[col.key] ?? '')}

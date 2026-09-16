@@ -19,8 +19,8 @@ export default function Clientes() {
     <div className="min-h-screen bg-surface p-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-primary">Clientes</h1>
-          <p className="text-sm text-slate-500">Administra tus clientes</p>
+          <h1 className="text-2xl font-bold text-neutral-950">Clientes</h1>
+          <p className="text-sm text-neutral-500">Administra tus clientes</p>
         </div>
         <Link to="/clientes/nuevo">
           <Button>+ Nuevo cliente</Button>

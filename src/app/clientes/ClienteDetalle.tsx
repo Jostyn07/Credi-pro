@@ -53,7 +53,7 @@ export default function ClienteDetalle() {
         <div className="mt-4 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold text-primary">{client.full_name}</h1>
-            <p className="text-sm text-slate-500">{client.identification}</p>
+            <p className="text-sm text-neutral-500">{client.identification}</p>
           </div>
           <Link to={`/prestamos/nuevo?clientId=${client.id}`}>
             <Button>+ Nuevo préstamo</Button>
@@ -63,23 +63,23 @@ export default function ClienteDetalle() {
         <Card className="mt-6">
           <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
             <div>
-              <p className="text-slate-400">Teléfono</p>
+              <p className="text-neutral-400">Teléfono</p>
               <p className="text-primary">{client.phone || '—'}</p>
             </div>
             <div>
-              <p className="text-slate-400">WhatsApp</p>
+              <p className="text-neutral-400">WhatsApp</p>
               <p className="text-primary">{client.whatsapp || '—'}</p>
             </div>
             <div>
-              <p className="text-slate-400">Correo</p>
+              <p className="text-neutral-400">Correo</p>
               <p className="text-primary">{client.email || '—'}</p>
             </div>
             <div>
-              <p className="text-slate-400">Ciudad</p>
+              <p className="text-neutral-400">Ciudad</p>
               <p className="text-primary">{client.city || '—'}</p>
             </div>
             <div className="sm:col-span-2">
-              <p className="text-slate-400">Dirección</p>
+              <p className="text-neutral-400">Dirección</p>
               <p className="text-primary">{client.address || '—'}</p>
             </div>
           </div>
@@ -87,12 +87,12 @@ export default function ClienteDetalle() {
 
         <h2 className="mb-3 mt-8 text-sm font-medium text-primary">Préstamos ({loans.length})</h2>
         {loans.length === 0 ? (
-          <Card className="text-sm text-slate-400">Este cliente aún no tiene préstamos.</Card>
+          <Card className="text-sm text-neutral-400">Este cliente aún no tiene préstamos.</Card>
         ) : (
           <div className="flex flex-col gap-3">
             {loans.map((loan) => (
               <Link key={loan.id} to={`/prestamos/${loan.id}`}>
-                <Card className="flex items-center justify-between hover:border-accent">
+                <Card className="flex items-center justify-between hover:border-primary-500">
                   <span className="font-medium text-primary">{loan.loan_number}</span>
                   <Badge tone={loanStatusTone[loan.status] ?? 'neutral'}>{loan.status}</Badge>
                 </Card>

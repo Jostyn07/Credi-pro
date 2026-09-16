@@ -15,9 +15,9 @@ interface Row {
 
 export function AmortizationTable({ rows }: { rows: Row[] }) {
   return (
-    <div className="overflow-x-auto rounded-card border border-slate-100">
-      <table className="w-full text-left text-sm">
-        <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+    <div className="overflow-x-auto rounded-card border border-neutral-200">
+      <table className="w-full min-w-[560px] text-left text-sm">
+        <thead className="bg-neutral-100 text-xs uppercase text-neutral-500">
           <tr>
             <th className="px-4 py-2 font-medium">#</th>
             <th className="px-4 py-2 font-medium">Fecha</th>
@@ -27,7 +27,7 @@ export function AmortizationTable({ rows }: { rows: Row[] }) {
             {rows[0]?.balance !== undefined && <th className="px-4 py-2 font-medium">Saldo</th>}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-neutral-200">
           {rows.map((row) => (
             <tr key={row.number}>
               <td className="px-4 py-2 text-primary">{row.number}</td>

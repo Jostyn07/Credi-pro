@@ -7,6 +7,7 @@ import { Stepper } from '@/components/ui/Stepper'
 import { AmortizationTable } from '@/components/ui/AmortizationTable'
 import { getClients, type Client } from '@/services/clients'
 import { createLoan, previewAmortization, type AmortizationRow, type InterestModality } from '@/services/loans'
+import { generateContract } from '@/services/contracts'
 
 const STEPS = [{ label: 'Cliente' }, { label: 'Condiciones' }, { label: 'Calendario' }, { label: 'Resumen' }]
 
@@ -86,6 +87,13 @@ export default function NuevoPrestamo() {
         graceDays,
         lateFeeRate,
       })
+      // Generar el contrato es un paso independiente de create_loan() a propósito
+      // (ver nota de la Fase 4) — si falla, no impide seguir con el préstamo ya creado.
+      try {
+        await generateContract(loan.id)
+      } catch (contractError) {
+        console.error('No se pudo generar el contrato automáticamente:', contractError)
+      }
       navigate(`/prestamos/${loan.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo crear el préstamo')
@@ -109,7 +117,7 @@ export default function NuevoPrestamo() {
             <div className="flex flex-col gap-4">
               <label className="text-sm font-medium text-primary">Seleccionar cliente</label>
               <select
-                className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-primary"
+                className="h-10 rounded-lg border border-neutral-300 px-3 text-sm text-primary"
                 value={clientId}
                 onChange={(e) => setClientId(e.target.value)}
               >
@@ -148,7 +156,7 @@ export default function NuevoPrestamo() {
               <div>
                 <label className="text-sm font-medium text-primary">Modalidad de cálculo</label>
                 <select
-                  className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-primary"
+                  className="mt-1.5 h-10 w-full rounded-lg border border-neutral-300 px-3 text-sm text-primary"
                   value={interestModality}
                   onChange={(e) => setInterestModality(e.target.value as InterestModality)}
                 >
@@ -223,7 +231,7 @@ export default function NuevoPrestamo() {
 
           {step === 3 && (
             <div className="flex flex-col gap-4">
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-neutral-500">
                 Vista previa del calendario de amortización ({modalityLabels[interestModality]}).
               </p>
               <AmortizationTable rows={schedule} />
@@ -242,33 +250,33 @@ export default function NuevoPrestamo() {
           {step === 4 && (
             <div className="flex flex-col gap-4">
               <div className="rounded-lg bg-accent/10 p-4">
-                <p className="text-sm text-slate-600">Cliente</p>
+                <p className="text-sm text-neutral-600">Cliente</p>
                 <p className="font-medium text-primary">{selectedClient?.full_name}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-slate-400">Monto solicitado</p>
+                  <p className="text-neutral-400">Monto solicitado</p>
                   <p className="font-medium text-primary">{formatCOP(principal)}</p>
                 </div>
                 <div>
-                  <p className="text-slate-400">Tasa</p>
+                  <p className="text-neutral-400">Tasa</p>
                   <p className="font-medium text-primary">{interestRate}% mensual</p>
                 </div>
                 <div>
-                  <p className="text-slate-400">Modalidad</p>
+                  <p className="text-neutral-400">Modalidad</p>
                   <p className="font-medium text-primary">{modalityLabels[interestModality]}</p>
                 </div>
                 <div>
-                  <p className="text-slate-400">Plazo</p>
+                  <p className="text-neutral-400">Plazo</p>
                   <p className="font-medium text-primary">{termMonths} meses</p>
                 </div>
                 <div>
-                  <p className="text-slate-400">Cuota estimada</p>
+                  <p className="text-neutral-400">Cuota estimada</p>
                   <p className="font-medium text-primary">{formatCOP(estimatedInstallment)}</p>
                 </div>
                 <div>
-                  <p className="text-slate-400">Total a pagar</p>
+                  <p className="text-neutral-400">Total a pagar</p>
                   <p className="font-medium text-primary">{formatCOP(totalToPay)}</p>
                 </div>
               </div>

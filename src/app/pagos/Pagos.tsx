@@ -23,8 +23,8 @@ export default function Pagos() {
   return (
     <div className="min-h-screen bg-surface p-6">
       <div className="mb-6">
-        <h1 className="text-xl font-semibold text-primary">Pagos</h1>
-        <p className="text-sm text-slate-500">Últimos pagos registrados en toda tu cartera</p>
+        <h1 className="text-2xl font-bold text-neutral-950">Pagos</h1>
+        <p className="text-sm text-neutral-500">Últimos pagos registrados en toda tu cartera</p>
       </div>
 
       {loading ? (

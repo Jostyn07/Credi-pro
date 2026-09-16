@@ -138,7 +138,7 @@ export function RegistrarPagoModal({ loanId, open, onClose, onSuccess }: Registr
           <div>
             <label className="text-sm font-medium text-primary">Medio de pago</label>
             <select
-              className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-primary"
+              className="mt-1.5 h-10 w-full rounded-lg border border-neutral-300 px-3 text-sm text-primary"
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value)}
             >
@@ -179,7 +179,7 @@ export function RegistrarPagoModal({ loanId, open, onClose, onSuccess }: Registr
             {strategyOptions.map((opt) => (
               <label
                 key={opt.value}
-                className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-3 hover:border-accent"
+                className="flex cursor-pointer items-start gap-3 rounded-lg border border-neutral-300 p-3 hover:border-primary-500"
               >
                 <input
                   type="radio"
@@ -190,7 +190,7 @@ export function RegistrarPagoModal({ loanId, open, onClose, onSuccess }: Registr
                 />
                 <div>
                   <p className="text-sm font-medium text-primary">{opt.label}</p>
-                  <p className="text-xs text-slate-500">{opt.description}</p>
+                  <p className="text-xs text-neutral-500">{opt.description}</p>
                 </div>
               </label>
             ))}
