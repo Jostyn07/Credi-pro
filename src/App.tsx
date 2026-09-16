@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 
 import Login from '@/app/auth/Login'
 import Registro from '@/app/auth/Registro'
-import RecuperarContrasena from '@/app/auth/RecuperarContrasena'
+import RecuperarContrasena from '@/app/auth/RestablecerContrasena'
 import RestablecerContrasena from '@/app/auth/RestablecerContrasena'
 import CrearOrganizacion from '@/app/onboarding/CrearOrganizacion'
 import SeleccionarPlan from '@/app/onboarding/SeleccionarPlan'
