@@ -1,8 +1,27 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Wallet, PiggyBank, TrendingUp, AlertTriangle, Users, Landmark } from 'lucide-react'
+import {
+  Users,
+  Landmark,
+  PiggyBank,
+  Coins,
+  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
+} from 'lucide-react'
 import { Card } from '@/components/ui/Card'
-import { getDashboardStats, type DashboardStats } from '@/services/dashboard'
+import {
+  getDashboardStats,
+  getDashboardKPIs,
+  getIngresosYCarteraSeries,
+  getLoanStatusDistribution,
+  type DashboardStats,
+  type DashboardKPIs,
+  type StatWithChange,
+  type DailySeriesPoint,
+  type LoanStatusDistribution,
+} from '@/services/dashboard'
+import { IngresosYCarteraChart, LoanStatusDonut } from './DashboardCharts'
 import { cn } from '@/utils/cn'
 
 function formatCOP(value: number) {
@@ -13,9 +32,10 @@ function formatCOP(value: number) {
 
 interface StatCardProps {
   label: string
-  value: string
-  icon: typeof Wallet
+  stat: StatWithChange
+  icon: typeof Users
   tone: 'primary' | 'warning' | 'success' | 'danger' | 'info'
+  format?: (v: number) => string
 }
 
 const toneStyles: Record<StatCardProps['tone'], string> = {
@@ -26,27 +46,53 @@ const toneStyles: Record<StatCardProps['tone'], string> = {
   info: 'bg-info-100 text-info-700',
 }
 
-function StatCard({ label, value, icon: Icon, tone }: StatCardProps) {
+function StatCard({ label, stat, icon: Icon, tone, format }: StatCardProps) {
+  const displayValue = format ? format(stat.value) : stat.value.toLocaleString('es-CO')
+
   return (
-    <Card className="flex items-center gap-4">
-      <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-lg', toneStyles[tone])}>
-        <Icon size={20} />
+    <Card>
+      <div className="flex items-center gap-3">
+        <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-lg', toneStyles[tone])}>
+          <Icon size={20} />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm text-neutral-500">{label}</p>
+          <p className="mt-0.5 truncate text-xl font-bold text-neutral-950">{displayValue}</p>
+        </div>
       </div>
-      <div>
-        <p className="text-sm text-neutral-500">{label}</p>
-        <p className="mt-0.5 text-xl font-bold text-neutral-950">{value}</p>
-      </div>
+      {stat.changePct !== null && (
+        <div className="mt-2 flex items-center gap-1 text-xs">
+          {stat.changePct >= 0 ? (
+            <TrendingUp size={14} className="text-success-600" />
+          ) : (
+            <TrendingDown size={14} className="text-danger-600" />
+          )}
+          <span className={stat.changePct >= 0 ? 'font-medium text-success-600' : 'font-medium text-danger-600'}>
+            {stat.changePct >= 0 ? '+' : ''}
+            {stat.changePct}%
+          </span>
+          <span className="text-neutral-400">vs. mes anterior</span>
+        </div>
+      )}
     </Card>
   )
 }
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [kpis, setKpis] = useState<DashboardKPIs | null>(null)
+  const [series, setSeries] = useState<DailySeriesPoint[]>([])
+  const [distribution, setDistribution] = useState<LoanStatusDistribution | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getDashboardStats()
-      .then(setStats)
+    Promise.all([getDashboardStats(), getDashboardKPIs(), getIngresosYCarteraSeries(30), getLoanStatusDistribution()])
+      .then(([s, k, ser, dist]) => {
+        setStats(s)
+        setKpis(k)
+        setSeries(ser)
+        setDistribution(dist)
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -68,26 +114,44 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {loading || !stats ? (
+        {loading || !stats || !kpis ? (
           <div className="flex justify-center py-16">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard label="Clientes" value={stats.totalClients.toString()} icon={Users} tone="info" />
-              <StatCard label="Préstamos activos" value={stats.activeLoans.toString()} icon={Landmark} tone="primary" />
-              <StatCard label="Capital prestado" value={formatCOP(stats.capitalLent)} icon={Wallet} tone="primary" />
-              <StatCard label="Capital pendiente" value={formatCOP(stats.capitalPending)} icon={PiggyBank} tone="warning" />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              <StatCard label="Clientes activos" stat={kpis.activeClients} icon={Users} tone="info" />
+              <StatCard label="Préstamos activos" stat={kpis.activeLoans} icon={Landmark} tone="primary" />
+              <StatCard
+                label="Capital pendiente"
+                stat={kpis.capitalPending}
+                icon={PiggyBank}
+                tone="warning"
+                format={formatCOP}
+              />
+              <StatCard
+                label="Pagos recibidos (mes)"
+                stat={kpis.paymentsThisMonth}
+                icon={Coins}
+                tone="success"
+                format={formatCOP}
+              />
+              <StatCard label="Clientes en mora" stat={kpis.clientsInArrears} icon={AlertTriangle} tone="danger" />
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-              <StatCard
-                label="Cartera vencida"
-                value={formatCOP(stats.overdueBalance)}
-                icon={AlertTriangle}
-                tone="danger"
-              />
+              <div className="lg:col-span-2">
+                <IngresosYCarteraChart series={series} />
+              </div>
+              {distribution && <LoanStatusDonut distribution={distribution} />}
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <Card>
+                <p className="text-xs text-neutral-400">Cartera vencida</p>
+                <p className="mt-1 text-lg font-bold text-danger-600">{formatCOP(stats.overdueBalance)}</p>
+              </Card>
 
               <Card className="lg:col-span-2">
                 <div className="mb-3 flex items-center gap-2">
