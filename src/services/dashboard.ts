@@ -255,6 +255,117 @@ export async function getLoanStatusDistribution(): Promise<LoanStatusDistributio
   }
 }
 
+export interface RecentClient {
+  id: string
+  full_name: string
+  identification: string | null
+  phone: string | null
+  status: string
+}
+
+export async function getRecentClients(limit = 5): Promise<RecentClient[]> {
+  const { data, error } = await supabase
+    .from('clients')
+    .select('id, full_name, identification, phone, status')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return data as unknown as RecentClient[]
+}
+
+export interface RecentLoan {
+  id: string
+  loan_number: string
+  status: string
+  disbursement_date: string
+  principal: number
+  client_name: string
+}
+
+export async function getRecentLoans(limit = 5): Promise<RecentLoan[]> {
+  const { data, error } = await supabase
+    .from('loans')
+    .select('id, loan_number, status, created_at, clients(full_name), loan_conditions(principal, disbursement_date)')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return ((data ?? []) as any[]).map((l) => ({
+    id: l.id,
+    loan_number: l.loan_number,
+    status: l.status,
+    disbursement_date: l.loan_conditions?.disbursement_date ?? l.created_at,
+    principal: Number(l.loan_conditions?.principal ?? 0),
+    client_name: l.clients?.full_name ?? '—',
+  }))
+}
+
+export type ActivityType = 'cliente' | 'prestamo' | 'pago' | 'documento'
+
+export interface ActivityItem {
+  type: ActivityType
+  title: string
+  subtitle: string
+  timestamp: string
+}
+
+// "Actividad reciente" combinando los eventos reales que sí registramos hoy.
+// No existe todavía una tabla de auditoría general (eso es Bloque 6) — esto
+// se arma a partir de created_at/generated_at de clientes, préstamos, pagos
+// y contratos, sin inventar ni aproximar nada.
+export async function getRecentActivity(limit = 8): Promise<ActivityItem[]> {
+  const perSource = Math.min(limit, 6)
+  const [clients, loans, payments, contracts] = await Promise.all([
+    supabase.from('clients').select('full_name, created_at').order('created_at', { ascending: false }).limit(perSource),
+    supabase
+      .from('loans')
+      .select('loan_number, created_at, clients(full_name), loan_conditions(principal)')
+      .order('created_at', { ascending: false })
+      .limit(perSource),
+    supabase
+      .from('payments')
+      .select('amount, created_at, loans(clients(full_name))')
+      .order('created_at', { ascending: false })
+      .limit(perSource),
+    supabase
+      .from('contracts')
+      .select('contract_number, generated_at, loans(clients(full_name))')
+      .order('generated_at', { ascending: false })
+      .limit(perSource),
+  ])
+
+  const formatCOP = (v: number) =>
+    new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v)
+
+  const items: ActivityItem[] = [
+    ...((clients.data ?? []) as any[]).map((c) => ({
+      type: 'cliente' as const,
+      title: 'Nuevo cliente',
+      subtitle: c.full_name,
+      timestamp: c.created_at,
+    })),
+    ...((loans.data ?? []) as any[]).map((l) => ({
+      type: 'prestamo' as const,
+      title: 'Nuevo préstamo',
+      subtitle: `${l.clients?.full_name ?? '—'} · ${formatCOP(Number(l.loan_conditions?.principal ?? 0))}`,
+      timestamp: l.created_at,
+    })),
+    ...((payments.data ?? []) as any[]).map((p) => ({
+      type: 'pago' as const,
+      title: 'Pago registrado',
+      subtitle: `${p.loans?.clients?.full_name ?? '—'} · ${formatCOP(Number(p.amount))}`,
+      timestamp: p.created_at,
+    })),
+    ...((contracts.data ?? []) as any[]).map((c) => ({
+      type: 'documento' as const,
+      title: 'Documento generado',
+      subtitle: `Contrato · ${c.loans?.clients?.full_name ?? '—'}`,
+      timestamp: c.generated_at,
+    })),
+  ]
+
+  return items.sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, limit)
+}
+
 export async function getDashboardStats(): Promise<DashboardStats> {
   const [{ count: totalClients }, loansResult, installmentsResult] = await Promise.all([
     supabase.from('clients').select('id', { count: 'exact', head: true }),

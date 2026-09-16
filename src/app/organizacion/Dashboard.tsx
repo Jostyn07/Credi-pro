@@ -15,13 +15,21 @@ import {
   getDashboardKPIs,
   getIngresosYCarteraSeries,
   getLoanStatusDistribution,
+  getRecentClients,
+  getRecentLoans,
+  getRecentActivity,
   type DashboardStats,
   type DashboardKPIs,
   type StatWithChange,
   type DailySeriesPoint,
   type LoanStatusDistribution,
+  type RecentClient,
+  type RecentLoan,
+  type ActivityItem,
 } from '@/services/dashboard'
 import { IngresosYCarteraChart, LoanStatusDonut } from './DashboardCharts'
+import { RecentClientsCard, RecentLoansCard, RecentActivityCard } from './DashboardRecent'
+import { relativeDayLabel } from '@/utils/dateLabels'
 import { cn } from '@/utils/cn'
 
 function formatCOP(value: number) {
@@ -83,15 +91,29 @@ export default function Dashboard() {
   const [kpis, setKpis] = useState<DashboardKPIs | null>(null)
   const [series, setSeries] = useState<DailySeriesPoint[]>([])
   const [distribution, setDistribution] = useState<LoanStatusDistribution | null>(null)
+  const [recentClients, setRecentClients] = useState<RecentClient[]>([])
+  const [recentLoans, setRecentLoans] = useState<RecentLoan[]>([])
+  const [activity, setActivity] = useState<ActivityItem[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([getDashboardStats(), getDashboardKPIs(), getIngresosYCarteraSeries(30), getLoanStatusDistribution()])
-      .then(([s, k, ser, dist]) => {
+    Promise.all([
+      getDashboardStats(),
+      getDashboardKPIs(),
+      getIngresosYCarteraSeries(30),
+      getLoanStatusDistribution(),
+      getRecentClients(5),
+      getRecentLoans(5),
+      getRecentActivity(8),
+    ])
+      .then(([s, k, ser, dist, clients, loans, act]) => {
         setStats(s)
         setKpis(k)
         setSeries(ser)
         setDistribution(dist)
+        setRecentClients(clients)
+        setRecentLoans(loans)
+        setActivity(act)
       })
       .finally(() => setLoading(false))
   }, [])
@@ -166,16 +188,23 @@ export default function Dashboard() {
                       <li key={i} className="flex items-center justify-between py-2 text-sm">
                         <div>
                           <p className="font-medium text-neutral-950">{p.clientName}</p>
-                          <p className="text-xs text-neutral-400">
-                            {p.loanNumber} · {new Date(p.dueDate).toLocaleDateString('es-CO')}
-                          </p>
+                          <p className="text-xs text-neutral-400">{p.loanNumber}</p>
                         </div>
-                        <p className="font-semibold text-neutral-950">{formatCOP(p.total)}</p>
+                        <div className="text-right">
+                          <p className="font-semibold text-neutral-950">{formatCOP(p.total)}</p>
+                          <p className="text-xs text-accent">{relativeDayLabel(p.dueDate)}</p>
+                        </div>
                       </li>
                     ))}
                   </ul>
                 )}
               </Card>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <RecentClientsCard clients={recentClients} />
+              <RecentLoansCard loans={recentLoans} />
+              <RecentActivityCard items={activity} />
             </div>
           </>
         )}
