@@ -4,6 +4,7 @@ import Login from '@/app/auth/Login'
 import Registro from '@/app/auth/Registro'
 import RecuperarContrasena from '@/app/auth/RestablecerContrasena'
 import RestablecerContrasena from '@/app/auth/RestablecerContrasena'
+import AuthCallback from '@/app/auth/AuthCallback'
 import CrearOrganizacion from '@/app/onboarding/CrearOrganizacion'
 import SeleccionarPlan from '@/app/onboarding/SeleccionarPlan'
 import Listo from '@/app/onboarding/Listo'
@@ -48,6 +49,7 @@ export default function App() {
       <Route path="/registro" element={<Registro />} />
       <Route path="/recuperar-contrasena" element={<RecuperarContrasena />} />
       <Route path="/restablecer-contrasena" element={<RestablecerContrasena />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
 
       {/* onboarding — requiere sesión, pero aún no organización */}
       <Route

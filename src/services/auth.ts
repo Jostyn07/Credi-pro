@@ -4,7 +4,17 @@ export async function signUp(email: string, password: string, fullName: string) 
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { full_name: fullName } },
+    options: {
+      data: { full_name: fullName },
+      // Sin esto, Supabase redirige al Site URL configurado en el dashboard
+      // (Authentication > URL Configuration), que puede no coincidir con el
+      // origen real desde el que se registró el usuario (localhost en dev,
+      // dominio de producción en prod). Al ser explícito, siempre vuelve al
+      // mismo origen desde el que se hizo el registro.
+      // IMPORTANTE: esta URL debe estar en la lista de "Redirect URLs"
+      // permitidas en Supabase, o el enlace del correo fallará.
+      emailRedirectTo: `${window.location.origin}/auth/callback`,
+    },
   })
   if (error) throw error
   return data
