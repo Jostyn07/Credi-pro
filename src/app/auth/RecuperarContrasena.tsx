@@ -1,27 +1,60 @@
-import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
-import { ArrowLeft, Info, KeyRound } from 'lucide-react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
+import { PasswordInput } from '@/components/ui/PasswordInput'
 import { Logo } from '@/components/ui/Logo'
 import { AuthFooter } from '@/components/ui/AuthFooter'
-import { requestPasswordReset } from '@/services/auth'
+import { supabase } from '@/lib/supabaseClient'
 
-export default function RecuperarContrasena() {
-  const [email, setEmail] = useState('')
-  const [sent, setSent] = useState(false)
+export default function RestablecerContrasena() {
+  const navigate = useNavigate()
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
+  const [sessionReady, setSessionReady] = useState(false)
+  const [checkingLink, setCheckingLink] = useState(true)
+
+  useEffect(() => {
+    // El enlace del correo (?type=recovery) hace que supabase-js cree una
+    // sesión temporal automáticamente al cargar esta página. La esperamos
+    // antes de mostrar el formulario.
+    supabase.auth.getSession().then(({ data }) => {
+      setSessionReady(!!data.session)
+      setCheckingLink(false)
+    })
+
+    const { data: listener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
+        setSessionReady(true)
+      }
+    })
+
+    return () => listener.subscription.unsubscribe()
+  }, [])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
+
+    if (password !== confirmPassword) {
+      setError('Las contraseñas no coinciden')
+      return
+    }
+    if (password.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres')
+      return
+    }
+
     setLoading(true)
     try {
-      await requestPasswordReset(email)
-      setSent(true)
+      const { error: updateError } = await supabase.auth.updateUser({ password })
+      if (updateError) throw updateError
+      setSuccess(true)
+      setTimeout(() => navigate('/dashboard'), 2000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo enviar el correo')
+      setError(err instanceof Error ? err.message : 'No se pudo actualizar la contraseña')
     } finally {
       setLoading(false)
     }
@@ -31,63 +64,53 @@ export default function RecuperarContrasena() {
     <div className="flex min-h-screen flex-col bg-surface">
       <div className="flex flex-1 items-center justify-center p-4">
         <div className="w-full max-w-md rounded-card bg-surface-card p-8 shadow-sm sm:p-10">
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-6 flex justify-center">
             <Logo />
-            <select
-              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-600"
-              defaultValue="es"
-              aria-label="Idioma"
-            >
-              <option value="es">🌐 ES</option>
-            </select>
           </div>
 
-          <Link to="/login" className="mb-6 flex items-center gap-1.5 text-sm text-accent hover:underline">
-            <ArrowLeft size={14} /> Volver al inicio
-          </Link>
+          <h1 className="mb-1 text-center text-xl font-semibold text-primary">Establece tu nueva contraseña</h1>
 
-          <div className="flex flex-col items-center text-center">
-            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-accent/10">
-              <KeyRound size={36} className="text-accent" />
+          {checkingLink ? (
+            <div className="mt-6 flex justify-center">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" />
             </div>
-
-            <h1 className="mt-6 text-2xl font-semibold text-primary">Recupera tu contraseña</h1>
-            <p className="mt-2 text-sm text-slate-500">
-              Ingresa tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña.
-            </p>
-          </div>
-
-          {sent ? (
-            <div className="mt-6 flex items-start gap-3 rounded-lg bg-accent/10 p-4 text-sm text-accent">
-              <Info size={18} className="mt-0.5 shrink-0" />
-              <p>
-                Revisa tu bandeja de entrada y también la carpeta de spam. El enlace expirará en 1 hora.
+          ) : !sessionReady ? (
+            <div className="mt-6 text-center">
+              <p className="text-sm text-status-danger">
+                Este enlace no es válido o ya expiró. Solicita uno nuevo.
               </p>
+              <Link to="/recuperar-contrasena" className="mt-4 inline-block text-sm text-accent hover:underline">
+                Solicitar nuevo enlace
+              </Link>
             </div>
+          ) : success ? (
+            <p className="mt-6 text-center text-sm text-status-success">
+              Contraseña actualizada. Redirigiendo...
+            </p>
           ) : (
             <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
-              <Input
-                id="email"
-                type="email"
-                label="Correo electrónico"
-                placeholder="tu@empresa.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+              <PasswordInput
+                id="password"
+                label="Nueva contraseña"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 required
               />
+              <PasswordInput
+                id="confirmPassword"
+                label="Confirmar nueva contraseña"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+
               {error && <p className="text-sm text-status-danger">{error}</p>}
+
               <Button type="submit" loading={loading} className="w-full">
-                Enviar enlace
+                Guardar nueva contraseña
               </Button>
             </form>
           )}
-
-          <p className="mt-6 text-center text-sm text-slate-500">
-            ¿Recordaste tu contraseña?{' '}
-            <Link to="/login" className="font-medium text-accent hover:underline">
-              Iniciar sesión
-            </Link>
-          </p>
         </div>
       </div>
 
