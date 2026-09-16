@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabaseClient'
+import { pctChange, monthStart, type StatWithChange } from '@/services/dashboard'
 
 export interface Client {
   id: string
@@ -67,4 +68,50 @@ export async function updateClient(id: string, input: Partial<ClientInput>): Pro
   const { data, error } = await supabase.from('clients').update(input).eq('id', id).select().single()
   if (error) throw error
   return data as unknown as Client
+}
+
+export interface ClientStats {
+  total: StatWithChange
+  active: StatWithChange
+  inArrears: StatWithChange
+  newThisMonth: StatWithChange
+}
+
+// Igual que en el Dashboard: total/activos/nuevos son exactos (created_at no
+// cambia); "en mora" no tiene un histórico real de comparación disponible.
+export async function getClientStats(): Promise<ClientStats> {
+  const now = new Date()
+  const startThisMonth = monthStart(now, 0)
+  const startLastMonth = monthStart(now, -1)
+
+  const [totalNow, totalBefore, activeNow, activeBefore, newThisMonth, newLastMonth, overdueRows] =
+    await Promise.all([
+      supabase.from('clients').select('id', { count: 'exact', head: true }),
+      supabase.from('clients').select('id', { count: 'exact', head: true }).lt('created_at', startThisMonth),
+      supabase.from('clients').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+      supabase
+        .from('clients')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'active')
+        .lt('created_at', startThisMonth),
+      supabase.from('clients').select('id', { count: 'exact', head: true }).gte('created_at', startThisMonth),
+      supabase
+        .from('clients')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', startLastMonth)
+        .lt('created_at', startThisMonth),
+      supabase.from('installments').select('loans(client_id)').eq('status', 'overdue'),
+    ])
+
+  const inArrearsNow = new Set(((overdueRows.data ?? []) as any[]).map((r) => r.loans?.client_id)).size
+
+  return {
+    total: { value: totalNow.count ?? 0, changePct: pctChange(totalNow.count ?? 0, totalBefore.count ?? 0) },
+    active: { value: activeNow.count ?? 0, changePct: pctChange(activeNow.count ?? 0, activeBefore.count ?? 0) },
+    inArrears: { value: inArrearsNow, changePct: null },
+    newThisMonth: {
+      value: newThisMonth.count ?? 0,
+      changePct: pctChange(newThisMonth.count ?? 0, newLastMonth.count ?? 0),
+    },
+  }
 }

@@ -22,12 +22,12 @@ export interface DashboardKPIs {
   clientsInArrears: StatWithChange
 }
 
-function pctChange(current: number, previous: number): number | null {
+export function pctChange(current: number, previous: number): number | null {
   if (previous <= 0) return null
   return Math.round(((current - previous) / previous) * 100)
 }
 
-function monthStart(date: Date, offsetMonths = 0): string {
+export function monthStart(date: Date, offsetMonths = 0): string {
   const d = new Date(date.getFullYear(), date.getMonth() + offsetMonths, 1)
   return d.toISOString().slice(0, 10)
 }
