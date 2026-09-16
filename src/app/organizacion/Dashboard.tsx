@@ -8,8 +8,12 @@ import {
   AlertTriangle,
   TrendingUp,
   TrendingDown,
+  Rocket,
+  Crown,
+  Headphones,
 } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
 import {
   getDashboardStats,
   getDashboardKPIs,
@@ -30,6 +34,9 @@ import {
 import { IngresosYCarteraChart, LoanStatusDonut } from './DashboardCharts'
 import { RecentClientsCard, RecentLoansCard, RecentActivityCard } from './DashboardRecent'
 import { relativeDayLabel } from '@/utils/dateLabels'
+import { useSubscription } from '@/hooks/useSubscription'
+import { useAuth } from '@/contexts/AuthContext'
+import { getOrganizationUsage } from '@/services/organization'
 import { cn } from '@/utils/cn'
 
 function formatCOP(value: number) {
@@ -94,7 +101,15 @@ export default function Dashboard() {
   const [recentClients, setRecentClients] = useState<RecentClient[]>([])
   const [recentLoans, setRecentLoans] = useState<RecentLoan[]>([])
   const [activity, setActivity] = useState<ActivityItem[]>([])
+  const [planName, setPlanName] = useState<string>('')
   const [loading, setLoading] = useState(true)
+  const { profile } = useAuth()
+  const { isTrialing, isBlocked, trialDaysRemaining, subscription } = useSubscription()
+
+  useEffect(() => {
+    if (!profile?.organization_id || !profile.id) return
+    getOrganizationUsage(profile.organization_id, profile.id).then((u) => setPlanName(u.planName))
+  }, [profile?.organization_id, profile?.id])
 
   useEffect(() => {
     Promise.all([
@@ -205,6 +220,89 @@ export default function Dashboard() {
               <RecentClientsCard clients={recentClients} />
               <RecentLoansCard loans={recentLoans} />
               <RecentActivityCard items={activity} />
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <Card className="bg-primary-100/40 border-primary-200">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent text-white">
+                    <Rocket size={18} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-neutral-950">Saca el máximo provecho de CrediPro</p>
+                    <p className="mt-1 text-xs text-neutral-500">
+                      Explora nuestras guías interactivas y aprende a utilizar cada módulo.
+                    </p>
+                    <div className="mt-3 flex items-center gap-4">
+                      <Button size="sm">Comenzar guía</Button>
+                      <span className="text-xs font-medium text-neutral-500">Ahora no</span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="bg-success-100/40 border-success-100">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-success-600 text-white">
+                      <Crown size={18} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-neutral-500">
+                        Tu plan: <span className="font-semibold text-neutral-950">{planName || '—'}</span>
+                      </p>
+                      {isTrialing ? (
+                        <p className="text-sm font-semibold text-success-700">
+                          {trialDaysRemaining} día{trialDaysRemaining !== 1 ? 's' : ''} gratis restantes
+                        </p>
+                      ) : isBlocked ? (
+                        <p className="text-sm font-semibold text-danger-600">Suscripción vencida</p>
+                      ) : (
+                        <p className="text-sm font-semibold text-success-700">Suscripción activa</p>
+                      )}
+                    </div>
+                  </div>
+                  <Link to="/suscripcion">
+                    <Button size="sm" variant="secondary">
+                      Ver detalles
+                    </Button>
+                  </Link>
+                </div>
+                {isTrialing && (
+                  <>
+                    <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/60">
+                      <div
+                        className="h-full bg-success-600"
+                        style={{ width: `${Math.max(0, 100 - (trialDaysRemaining / 15) * 100)}%` }}
+                      />
+                    </div>
+                    {subscription?.trial_end && (
+                      <p className="mt-2 text-xs text-neutral-500">
+                        Vence: {new Date(subscription.trial_end).toLocaleDateString('es-CO', { day: 'numeric', month: 'long' })}
+                      </p>
+                    )}
+                  </>
+                )}
+              </Card>
+
+              <Card className="bg-danger-100/40 border-danger-100">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-danger-600 text-white">
+                    <Headphones size={18} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-neutral-950">¿Necesitas ayuda?</p>
+                    <p className="mt-1 text-xs text-neutral-500">
+                      Nuestro equipo está listo para apoyarte.
+                    </p>
+                    <a href="mailto:soporte@credipro.cloud" className="mt-3 inline-block">
+                      <Button size="sm" variant="danger">
+                        Contactar soporte
+                      </Button>
+                    </a>
+                  </div>
+                </div>
+              </Card>
             </div>
           </>
         )}
