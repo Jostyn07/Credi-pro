@@ -22,6 +22,7 @@ export interface RegisterPaymentInput {
   reference?: string
   notes?: string
   prepaymentStrategy?: PrepaymentStrategy
+  accountId?: string
 }
 
 export type PrepaymentStrategy = 'none' | 'reduce_term' | 'reduce_installment'
@@ -64,21 +65,29 @@ export async function registerPayment(input: RegisterPaymentInput): Promise<Paym
     p_reference: input.reference ?? null,
     p_notes: input.notes ?? null,
     p_prepayment_strategy: input.prepaymentStrategy ?? null,
+    p_account_id: input.accountId ?? null,
   })
   if (error) throw error
   return data as unknown as Payment
 }
 
-export async function liquidateLoan(
-  loanId: string,
-  paymentMethod?: string,
-  reference?: string,
-): Promise<Payment> {
+export interface LiquidateLoanInput {
+  loanId: string
+  paymentDate?: string
+  paymentMethod?: string
+  reference?: string
+  notes?: string
+  accountId?: string
+}
+
+export async function liquidateLoan(input: LiquidateLoanInput): Promise<Payment> {
   const { data, error } = await supabase.rpc('liquidate_loan', {
-    p_loan_id: loanId,
-    p_payment_date: new Date().toISOString().slice(0, 10),
-    p_payment_method: paymentMethod ?? null,
-    p_reference: reference ?? null,
+    p_loan_id: input.loanId,
+    p_payment_date: input.paymentDate ?? new Date().toISOString().slice(0, 10),
+    p_payment_method: input.paymentMethod ?? null,
+    p_reference: input.reference ?? null,
+    p_notes: input.notes ?? null,
+    p_account_id: input.accountId ?? null,
   })
   if (error) throw error
   return data as unknown as Payment

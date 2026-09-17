@@ -100,6 +100,7 @@ export type Database = {
           p_reference?: string | null
           p_notes?: string | null
           p_prepayment_strategy?: string | null
+          p_account_id?: string | null
         }
         Returns: Record<string, unknown>
       }
@@ -109,6 +110,8 @@ export type Database = {
           p_payment_date?: string
           p_payment_method?: string | null
           p_reference?: string | null
+          p_notes?: string | null
+          p_account_id?: string | null
         }
         Returns: Record<string, unknown>
       }

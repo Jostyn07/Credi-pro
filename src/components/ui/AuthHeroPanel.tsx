@@ -36,14 +36,6 @@ export function AuthHeroPanel() {
           ))}
         </ul>
       </div>
-
-      <div className="rounded-card bg-white/10 p-4 backdrop-blur-sm">
-        <p className="text-sm italic text-white/90">
-          &ldquo;CrediPro nos ha permitido tener un control total de nuestra cartera y crecer con
-          confianza.&rdquo;
-        </p>
-        <p className="mt-3 text-xs text-white/60">★★★★★ Finanzas del Norte S.A.S.</p>
-      </div>
     </div>
   )
 }

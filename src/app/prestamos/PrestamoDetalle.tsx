@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   Wallet,
   PiggyBank,
@@ -24,10 +24,9 @@ import {
   type LoanConditions,
   type Installment,
 } from '@/services/loans'
-import { getPaymentsByLoan, liquidateLoan, type Payment } from '@/services/payments'
+import { getPaymentsByLoan, type Payment } from '@/services/payments'
 import { getContractsByLoan, generateContract, type Contract } from '@/services/contracts'
 import { getCollectionActions, getPaymentPromises, type CollectionAction, type PaymentPromise } from '@/services/collection'
-import { RegistrarPagoModal } from './RegistrarPagoModal'
 import { RegistrarGestionModal } from '@/app/organizacion/RegistrarGestionModal'
 
 function formatCOP(value: number) {
@@ -84,6 +83,7 @@ type TabKey = (typeof TABS)[number]['key']
 
 export default function PrestamoDetalle() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const [loan, setLoan] = useState<Loan | null>(null)
   const [conditions, setConditions] = useState<LoanConditions | null>(null)
   const [installments, setInstallments] = useState<Installment[]>([])
@@ -95,9 +95,7 @@ export default function PrestamoDetalle() {
 
   const [tab, setTab] = useState<TabKey>('resumen')
   const [showActionsMenu, setShowActionsMenu] = useState(false)
-  const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [showGestionModal, setShowGestionModal] = useState(false)
-  const [liquidating, setLiquidating] = useState(false)
   const [generatingContract, setGeneratingContract] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -125,21 +123,6 @@ export default function PrestamoDetalle() {
   useEffect(() => {
     loadData().finally(() => setLoading(false))
   }, [loadData])
-
-  async function handleLiquidate() {
-    if (!id) return
-    setError(null)
-    setShowActionsMenu(false)
-    setLiquidating(true)
-    try {
-      await liquidateLoan(id)
-      await loadData()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo liquidar el préstamo')
-    } finally {
-      setLiquidating(false)
-    }
-  }
 
   async function handleGenerateContract() {
     if (!id) return
@@ -239,10 +222,7 @@ export default function PrestamoDetalle() {
                   {canOperate && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setShowActionsMenu(false)
-                        setShowPaymentModal(true)
-                      }}
+                      onClick={() => navigate(`/prestamos/${loan.id}/pagos/nuevo`)}
                       className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-primary hover:bg-neutral-50"
                     >
                       <CreditCard size={15} /> Registrar pago
@@ -279,9 +259,8 @@ export default function PrestamoDetalle() {
                   {canOperate && (
                     <button
                       type="button"
-                      onClick={handleLiquidate}
-                      disabled={liquidating}
-                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-status-danger hover:bg-danger-50 disabled:opacity-50"
+                      onClick={() => navigate(`/prestamos/${loan.id}/liquidar`)}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-status-danger hover:bg-danger-50"
                     >
                       <Ban size={15} /> Liquidar préstamo
                     </button>
@@ -418,7 +397,11 @@ export default function PrestamoDetalle() {
 
                 <div className="flex flex-col gap-3">
                   <p className="text-sm font-semibold text-primary">Acciones rápidas</p>
-                  <Button disabled={!canOperate} onClick={() => setShowPaymentModal(true)} className="justify-start">
+                  <Button
+                    disabled={!canOperate}
+                    onClick={() => navigate(`/prestamos/${loan.id}/pagos/nuevo`)}
+                    className="justify-start"
+                  >
                     <CreditCard size={16} /> Registrar pago
                   </Button>
                   <Button variant="secondary" onClick={() => setTab('cuotas')} className="justify-start">
@@ -444,8 +427,7 @@ export default function PrestamoDetalle() {
                   <Button
                     variant="danger"
                     disabled={!canOperate}
-                    loading={liquidating}
-                    onClick={handleLiquidate}
+                    onClick={() => navigate(`/prestamos/${loan.id}/liquidar`)}
                     className="justify-start"
                   >
                     <Ban size={16} /> Liquidar préstamo
@@ -603,12 +585,6 @@ export default function PrestamoDetalle() {
         </div>
       </div>
 
-      <RegistrarPagoModal
-        loanId={loan.id}
-        open={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
-        onSuccess={loadData}
-      />
       <RegistrarGestionModal
         clientId={loan.client_id}
         loanId={loan.id}

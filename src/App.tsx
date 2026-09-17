@@ -21,6 +21,8 @@ import ClienteDetalle from '@/app/clientes/ClienteDetalle'
 import Prestamos from '@/app/prestamos/Prestamos'
 import NuevoPrestamo from '@/app/prestamos/NuevoPrestamo'
 import PrestamoDetalle from '@/app/prestamos/PrestamoDetalle'
+import RegistrarPago from '@/app/prestamos/RegistrarPago'
+import LiquidacionTotal from '@/app/prestamos/LiquidacionTotal'
 import Pagos from '@/app/pagos/Pagos'
 import { AppLayout } from '@/components/AppLayout'
 import { RequireAuth, RequireOrganization, RequirePlatformAdmin } from '@/components/RouteGuard'
@@ -94,6 +96,8 @@ export default function App() {
         <Route path="/prestamos" element={<Prestamos />} />
         <Route path="/prestamos/nuevo" element={<NuevoPrestamo />} />
         <Route path="/prestamos/:id" element={<PrestamoDetalle />} />
+        <Route path="/prestamos/:id/pagos/nuevo" element={<RegistrarPago />} />
+        <Route path="/prestamos/:id/liquidar" element={<LiquidacionTotal />} />
 
         <Route path="/pagos" element={<Pagos />} />
         <Route path="/calendario" element={<Calendario />} />
