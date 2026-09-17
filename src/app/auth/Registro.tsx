@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { PasswordInput } from '@/components/ui/PasswordInput'
@@ -30,6 +31,8 @@ export default function Registro() {
     }
   }, [authLoading, session, profile, navigate])
 
+  const [emailSentTo, setEmailSentTo] = useState<string | null>(null)
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
@@ -49,9 +52,18 @@ export default function Registro() {
 
     setLoading(true)
     try {
-      await signUp(email, password, fullName)
+      const data = await signUp(email, password, fullName)
       // El trigger handle_new_user() crea el profile automáticamente.
-      navigate('/onboarding/crear-organizacion')
+      if (data.session) {
+        // "Confirm email" está desactivado en Supabase: ya hay sesión activa,
+        // seguimos directo al onboarding.
+        navigate('/onboarding/crear-organizacion')
+      } else {
+        // Falta confirmar el correo -- antes esto navegaba a onboarding
+        // igual, y como no había sesión, el guard de rutas te devolvía a
+        // /login en silencio, sin ninguna explicación.
+        setEmailSentTo(email)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo crear la cuenta')
     } finally {
@@ -101,11 +113,28 @@ export default function Registro() {
             Comienza a gestionar tu cartera con CrediPro. 15 días gratis, sin compromiso.
           </p>
 
-          <div className="mt-8">
-            <Stepper steps={ONBOARDING_STEPS} currentStep={1} />
-          </div>
+          {emailSentTo ? (
+            <div className="mt-8 text-center">
+              <CheckCircle2 size={40} className="mx-auto text-status-success" />
+              <h2 className="mt-4 text-lg font-semibold text-primary">Confirma tu correo para continuar</h2>
+              <p className="mt-2 text-sm text-slate-500">
+                Te enviamos un enlace de confirmación a <span className="font-medium">{emailSentTo}</span>.
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                Puede tardar unos minutos en llegar, y a veces cae en spam o correo no deseado — revisa ahí si no lo
+                ves en tu bandeja de entrada.
+              </p>
+              <Link to="/login" className="mt-6 inline-block text-sm font-medium text-accent hover:underline">
+                ← Volver a iniciar sesión
+              </Link>
+            </div>
+          ) : (
+            <>
+              <div className="mt-8">
+                <Stepper steps={ONBOARDING_STEPS} currentStep={1} />
+              </div>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Input
               id="fullName"
               label="Nombre completo"
@@ -184,14 +213,16 @@ export default function Registro() {
                 <MicrosoftIcon className="h-4 w-4" /> Microsoft
               </Button>
             </div>
-          </form>
+              </form>
 
-          <p className="mt-6 text-center text-sm text-slate-500">
-            ¿Ya tienes una cuenta?{' '}
-            <Link to="/login" className="font-medium text-accent hover:underline">
-              Inicia sesión
-            </Link>
-          </p>
+              <p className="mt-6 text-center text-sm text-slate-500">
+                ¿Ya tienes una cuenta?{' '}
+                <Link to="/login" className="font-medium text-accent hover:underline">
+                  Inicia sesión
+                </Link>
+              </p>
+            </>
+          )}
         </div>
       </div>
 
