@@ -159,6 +159,18 @@ export type Database = {
         Args: { p_loan_id: string }
         Returns: Record<string, unknown>
       }
+      get_org_last_sign_ins: {
+        Args: Record<string, never>
+        Returns: { user_id: string; last_sign_in_at: string | null }[]
+      }
+      get_org_auth_events: {
+        Args: { p_limit?: number }
+        Returns: { user_id: string; event_type: string; ip_address: string | null; created_at: string }[]
+      }
+      has_permission: {
+        Args: { permission_key: string }
+        Returns: boolean
+      }
     }
     Enums: Record<string, any>
   }

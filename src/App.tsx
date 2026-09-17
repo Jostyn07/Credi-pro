@@ -15,6 +15,17 @@ import Cobranza from '@/app/organizacion/Cobranza'
 import Caja from '@/app/organizacion/Caja'
 import Documentos from '@/app/organizacion/Documentos'
 import ContratoDetalle from '@/app/organizacion/ContratoDetalle'
+import Score from '@/app/organizacion/Score'
+import ScoreDetalle from '@/app/organizacion/ScoreDetalle'
+import Reportes from '@/app/organizacion/Reportes'
+import ReporteCartera from '@/app/organizacion/ReporteCartera'
+import ReportePagos from '@/app/organizacion/ReportePagos'
+import RecomendacionPrestamo from '@/app/organizacion/RecomendacionPrestamo'
+import HistorialRecomendaciones from '@/app/organizacion/HistorialRecomendaciones'
+import Usuarios from '@/app/organizacion/Usuarios'
+import Roles from '@/app/organizacion/Roles'
+import Configuracion from '@/app/organizacion/Configuracion'
+import Auditoria from '@/app/organizacion/Auditoria'
 import Clientes from '@/app/clientes/Clientes'
 import NuevoCliente from '@/app/clientes/NuevoCliente'
 import ClienteDetalle from '@/app/clientes/ClienteDetalle'
@@ -105,6 +116,21 @@ export default function App() {
         <Route path="/caja" element={<Caja />} />
         <Route path="/documentos" element={<Documentos />} />
         <Route path="/documentos/:id" element={<ContratoDetalle />} />
+
+        <Route path="/reportes" element={<Reportes />} />
+        <Route path="/reportes/cartera" element={<ReporteCartera />} />
+        <Route path="/reportes/pagos" element={<ReportePagos />} />
+
+        <Route path="/score" element={<Score />} />
+        <Route path="/score/historial" element={<HistorialRecomendaciones />} />
+        <Route path="/score/:clientId" element={<ScoreDetalle />} />
+        <Route path="/score/:clientId/recomendacion" element={<RecomendacionPrestamo />} />
+
+        <Route path="/usuarios" element={<Usuarios />} />
+        <Route path="/usuarios/roles" element={<Roles />} />
+
+        <Route path="/configuracion" element={<Configuracion />} />
+        <Route path="/configuracion/auditoria" element={<Auditoria />} />
 
         <Route path="/suscripcion" element={<Suscripcion />} />
       </Route>

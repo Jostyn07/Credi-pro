@@ -103,6 +103,17 @@ export async function getPaymentsByLoan(loanId: string): Promise<Payment[]> {
   return data as unknown as Payment[]
 }
 
+// payments no tiene client_id directo -- se llega por loans.client_id.
+export async function getPaymentsByClient(clientId: string): Promise<Payment[]> {
+  const { data, error } = await supabase
+    .from('payments')
+    .select('*, loans!inner(loan_number, client_id)')
+    .eq('loans.client_id', clientId)
+    .order('payment_date', { ascending: false })
+  if (error) throw error
+  return data as unknown as Payment[]
+}
+
 export async function getRecentPayments(limit = 10): Promise<Payment[]> {
   const { data, error } = await supabase
     .from('payments')

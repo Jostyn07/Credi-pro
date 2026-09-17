@@ -11,6 +11,22 @@ export interface CreateOrganizationInput {
   currency?: string
 }
 
+export interface OrganizationDefaults {
+  default_interest_rate: number | null
+  default_interest_modality: string | null
+  default_grace_days: number | null
+}
+
+export async function getOrganizationDefaults(organizationId: string): Promise<OrganizationDefaults> {
+  const { data, error } = await supabase
+    .from('organizations')
+    .select('default_interest_rate, default_interest_modality, default_grace_days')
+    .eq('id', organizationId)
+    .single()
+  if (error) throw error
+  return data as unknown as OrganizationDefaults
+}
+
 // Llama a la función SQL create_organization() (security definer) definida en
 // supabase/migrations/0001_core_schema.sql — crea la org, asigna al usuario
 // como admin, y actualiza su profile.organization_id, todo en una transacción.

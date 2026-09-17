@@ -133,6 +133,16 @@ export async function getLoans(): Promise<Loan[]> {
   return data as unknown as Loan[]
 }
 
+export async function getLoansByClient(clientId: string): Promise<Loan[]> {
+  const { data, error } = await supabase
+    .from('loans')
+    .select('*, clients(full_name, identification)')
+    .eq('client_id', clientId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data as unknown as Loan[]
+}
+
 export async function getLoan(id: string): Promise<Loan> {
   const { data, error } = await supabase.from('loans').select('*, clients(full_name, identification)').eq('id', id).single()
   if (error) throw error

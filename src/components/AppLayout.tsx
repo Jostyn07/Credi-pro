@@ -10,6 +10,10 @@ import {
   Banknote,
   FileText,
   CreditCard,
+  Brain,
+  UserCog,
+  Settings,
+  BarChart3,
   Menu,
   X,
   Search,
@@ -37,6 +41,10 @@ const navItems = [
   { to: '/cobranza', label: 'Cobranza', icon: PhoneCall },
   { to: '/caja', label: 'Caja', icon: Banknote },
   { to: '/documentos', label: 'Documentos', icon: FileText },
+  { to: '/reportes', label: 'Reportes', icon: BarChart3 },
+  { to: '/score', label: 'Score / IA', icon: Brain },
+  { to: '/usuarios', label: 'Usuarios', icon: UserCog },
+  { to: '/configuracion', label: 'Configuración', icon: Settings },
   { to: '/suscripcion', label: 'Suscripción', icon: CreditCard },
 ]
 
