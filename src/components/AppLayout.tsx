@@ -19,6 +19,8 @@ import {
   Search,
   HelpCircle,
   Bell,
+  AlertTriangle,
+  Clock,
   ChevronDown,
   Building2,
   LogOut,
@@ -28,6 +30,8 @@ import { TrialBanner } from '@/components/ui/TrialBanner'
 import { UsageBar } from '@/components/ui/UsageBar'
 import { useAuth } from '@/contexts/AuthContext'
 import { getOrganizationUsage, type OrganizationUsage } from '@/services/organization'
+import { globalSearch, type SearchResult } from '@/services/search'
+import { getNotifications, type Notification } from '@/services/notifications'
 import { cn } from '@/utils/cn'
 
 // Orden y set exacto de la Tabla 6 del documento de especificación
@@ -118,6 +122,206 @@ function OrganizationPanel() {
   )
 }
 
+function GlobalSearch() {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<SearchResult[]>([])
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (query.trim().length < 2) {
+      setResults([])
+      return
+    }
+    setLoading(true)
+    const handle = setTimeout(() => {
+      globalSearch(query)
+        .then(setResults)
+        .finally(() => setLoading(false))
+    }, 250)
+    return () => clearTimeout(handle)
+  }, [query])
+
+  function goTo(to: string) {
+    setOpen(false)
+    setQuery('')
+    navigate(to)
+  }
+
+  const typeLabels: Record<SearchResult['type'], string> = { cliente: 'Cliente', prestamo: 'Préstamo', pago: 'Pago' }
+
+  return (
+    <div className="relative max-w-xl flex-1">
+      <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value)
+          setOpen(true)
+        }}
+        onFocus={() => setOpen(true)}
+        placeholder="Buscar clientes, préstamos, pagos..."
+        className="h-10 w-full rounded-lg border border-neutral-200 bg-neutral-50 pl-9 pr-16 text-sm text-primary placeholder:text-neutral-400 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+      />
+      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-neutral-300 px-1.5 py-0.5 text-[10px] text-neutral-400">
+        Ctrl K
+      </span>
+
+      {open && query.trim().length >= 2 && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 right-0 z-20 mt-2 max-h-80 overflow-y-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg">
+            {loading ? (
+              <p className="px-4 py-3 text-sm text-neutral-400">Buscando...</p>
+            ) : results.length === 0 ? (
+              <p className="px-4 py-3 text-sm text-neutral-400">Sin resultados para "{query}"</p>
+            ) : (
+              results.map((r) => (
+                <button
+                  key={`${r.type}-${r.id}`}
+                  onClick={() => goTo(r.to)}
+                  className="flex w-full items-center justify-between px-4 py-2 text-left text-sm hover:bg-neutral-50"
+                >
+                  <div>
+                    <p className="font-medium text-primary">{r.title}</p>
+                    <p className="text-xs text-neutral-400">{r.subtitle}</p>
+                  </div>
+                  <span className="text-xs text-neutral-400">{typeLabels[r.type]}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function HelpButton() {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100"
+        aria-label="Ayuda"
+      >
+        <HelpCircle size={20} />
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4">
+          <div className="w-full max-w-sm rounded-card bg-white p-6 shadow-lg">
+            <p className="mb-4 text-sm font-semibold text-primary">¿Necesitas ayuda?</p>
+            <ul className="mb-4 flex flex-col gap-2 text-sm text-neutral-600">
+              <li>
+                <strong className="text-primary">Clientes y préstamos:</strong> crea un cliente antes de registrar
+                su primer préstamo.
+              </li>
+              <li>
+                <strong className="text-primary">Registrar un pago:</strong> desde el detalle del préstamo, botón
+                "Registrar pago".
+              </li>
+              <li>
+                <strong className="text-primary">Cobranza:</strong> registra cada gestión (llamada, WhatsApp, visita)
+                para llevar el historial de cada cliente.
+              </li>
+            </ul>
+            <a
+              href="mailto:soporte@credipro.cloud"
+              className="mb-2 block rounded-lg bg-accent px-4 py-2 text-center text-sm font-medium text-white hover:bg-primary-700"
+            >
+              Escribir a soporte@credipro.cloud
+            </a>
+            <button onClick={() => setOpen(false)} className="w-full text-center text-sm text-neutral-500 hover:underline">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+const notificationIcon: Record<Notification['type'], typeof AlertTriangle> = {
+  vencido: AlertTriangle,
+  proximo: Clock,
+  promesa_vencida: AlertTriangle,
+  promesa_hoy: Clock,
+}
+const notificationTone: Record<Notification['type'], string> = {
+  vencido: 'bg-danger-100 text-danger-600',
+  proximo: 'bg-warning-100 text-warning-600',
+  promesa_vencida: 'bg-danger-100 text-danger-600',
+  promesa_hoy: 'bg-info-100 text-info-700',
+}
+
+function NotificationsButton() {
+  const [open, setOpen] = useState(false)
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    getNotifications().then(setNotifications)
+  }, [])
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="relative rounded-lg p-2 text-neutral-500 hover:bg-neutral-100"
+        aria-label="Notificaciones"
+      >
+        <Bell size={20} />
+        {notifications.length > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-danger-600 text-[10px] font-semibold text-white">
+            {notifications.length}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-20 mt-2 w-80 rounded-lg border border-neutral-200 bg-white py-2 shadow-lg">
+            <p className="px-4 pb-2 text-sm font-semibold text-primary">Notificaciones</p>
+            {notifications.length === 0 ? (
+              <p className="px-4 py-4 text-center text-sm text-neutral-400">Todo al día. 🎉</p>
+            ) : (
+              <div className="max-h-80 overflow-y-auto">
+                {notifications.map((n) => {
+                  const Icon = notificationIcon[n.type]
+                  return (
+                    <button
+                      key={n.id}
+                      onClick={() => {
+                        setOpen(false)
+                        navigate(n.to)
+                      }}
+                      className="flex w-full items-start gap-3 px-4 py-2.5 text-left hover:bg-neutral-50"
+                    >
+                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${notificationTone[n.type]}`}>
+                        <Icon size={14} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-primary">{n.title}</p>
+                        <p className="truncate text-xs text-neutral-400">{n.subtitle}</p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function DesktopHeader() {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
@@ -136,25 +340,9 @@ function DesktopHeader() {
 
   return (
     <div className="hidden items-center gap-4 border-b border-neutral-200 bg-surface-card px-6 py-3 md:flex">
-      <div className="relative flex-1 max-w-xl">
-        <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-        <input
-          type="text"
-          placeholder="Buscar clientes, préstamos, pagos..."
-          className="h-10 w-full rounded-lg border border-neutral-200 bg-neutral-50 pl-9 pr-16 text-sm text-primary placeholder:text-neutral-400 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
-        />
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 rounded border border-neutral-300 px-1.5 py-0.5 text-[10px] text-neutral-400">
-          Ctrl K
-        </span>
-      </div>
-
-      <button className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100" aria-label="Ayuda">
-        <HelpCircle size={20} />
-      </button>
-
-      <button className="relative rounded-lg p-2 text-neutral-500 hover:bg-neutral-100" aria-label="Notificaciones">
-        <Bell size={20} />
-      </button>
+      <GlobalSearch />
+      <HelpButton />
+      <NotificationsButton />
 
       <div className="relative">
         <button
