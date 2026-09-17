@@ -94,6 +94,22 @@ export async function getWompiCheckoutParams(invoiceId: string) {
 
 export function daysRemaining(trialEnd: string | null): number {
   if (!trialEnd) return 0
-  const diffMs = new Date(trialEnd).getTime() - Date.now()
-  return Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
+
+  // Antes esto comparaba milisegundos exactos con Math.ceil, lo cual cuenta
+  // períodos de 24h desde la HORA exacta del registro, no días de
+  // calendario. Resultado: si te registraste, por ejemplo, ayer a las 5pm,
+  // hoy a las 10am seguía mostrando "15 días" porque no habían pasado 24h
+  // exactas todavía, aunque ya haya pasado un día calendario completo.
+  //
+  // Comparamos solo la fecha (medianoche a medianoche, hora local) para que
+  // el contador baje exactamente a la medianoche, como espera cualquiera
+  // que lo lea como "días de calendario", no como "horas transcurridas".
+  const end = new Date(trialEnd)
+  const endDateOnly = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+
+  const now = new Date()
+  const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+  const diffDays = Math.round((endDateOnly.getTime() - todayDateOnly.getTime()) / (1000 * 60 * 60 * 24))
+  return Math.max(0, diffDays)
 }
