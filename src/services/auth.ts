@@ -27,12 +27,16 @@ export async function signIn(email: string, password: string) {
 }
 
 export async function signInWithGoogle() {
-  const { data, error } = await supabase.auth.signInWithOAuth({
+  const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: `${window.location.origin}/dashboard` },
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`,
+    },
   })
-  if (error) throw error
-  return data
+
+  if (error) {
+    console.error(error)
+  }
 }
 
 // Supabase expone Microsoft (Azure AD) como proveedor "azure"
