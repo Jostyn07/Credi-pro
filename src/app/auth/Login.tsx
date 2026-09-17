@@ -205,7 +205,13 @@ export default function Login() {
                 <Button type="button" variant="secondary" onClick={handleGoogle}>
                   <GoogleIcon className="h-4 w-4" /> Google
                 </Button>
-                <Button type="button" variant="secondary" onClick={handleMicrosoft}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleMicrosoft}
+                  disabled
+                  title="Inicio de sesión con Microsoft deshabilitado temporalmente"
+                >
                   <MicrosoftIcon className="h-4 w-4" /> Microsoft
                 </Button>
               </div>

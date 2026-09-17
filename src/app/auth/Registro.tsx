@@ -1,74 +1,93 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { AuthError } from '@supabase/supabase-js'
+import { MailWarning, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { PasswordInput } from '@/components/ui/PasswordInput'
 import { Logo } from '@/components/ui/Logo'
+import { AuthHeroPanel } from '@/components/ui/AuthHeroPanel'
 import { AuthFooter } from '@/components/ui/AuthFooter'
-import { Stepper, ONBOARDING_STEPS } from '@/components/ui/Stepper'
 import { GoogleIcon, MicrosoftIcon } from '@/components/ui/BrandIcons'
-import { signUp, signInWithGoogle, signInWithMicrosoft } from '@/services/auth'
+import { signIn, signInWithGoogle, signInWithMicrosoft, resendSignupConfirmation } from '@/services/auth'
 import { useAuth } from '@/contexts/AuthContext'
 
-export default function Registro() {
+export default function Login() {
   const navigate = useNavigate()
   const { session, profile, loading: authLoading } = useAuth()
-  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [remember, setRemember] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // Mismo caso que en Login.tsx: si Google/Microsoft ya autenticó al usuario
-  // pero el flujo cayó de vuelta aquí en vez de en /auth/callback, lo
-  // mandamos para adelante en vez de dejarlo viendo el formulario otra vez.
+  // Si al entrar aquí ya hay una sesión activa (típicamente después de un
+  // login OAuth: Google/Supabase redirige de vuelta y, si /auth/callback no
+  // está en la lista de Redirect URLs permitidas de Supabase, cae de vuelta
+  // en el Site URL configurado -- que muchas veces es /login), lo mandamos
+  // para adelante en vez de dejarlo mirando el formulario de login otra vez.
   useEffect(() => {
     if (!authLoading && session) {
       navigate(profile?.organization_id ? '/dashboard' : '/onboarding/crear-organizacion', { replace: true })
     }
   }, [authLoading, session, profile, navigate])
 
+  // Cuando signIn() falla porque el correo no está confirmado, Supabase
+  // devuelve error.code === 'email_not_confirmed' en vez del genérico
+  // "credenciales inválidas". Guardamos el correo aquí para poder ofrecer
+  // "reenviar" sin que el usuario tenga que volver a escribirlo.
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null)
+  const [resending, setResending] = useState(false)
+  const [resendState, setResendState] = useState<'idle' | 'sent' | 'error'>('idle')
+
+  function updateEmail(value: string) {
+    setEmail(value)
+    if (unconfirmedEmail) {
+      setUnconfirmedEmail(null)
+      setResendState('idle')
+    }
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
-
-    if (!acceptedTerms) {
-      setError('Debes aceptar los Términos y Condiciones para continuar')
-      return
-    }
-    if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden')
-      return
-    }
-    if (password.length < 8) {
-      setError('La contraseña debe tener al menos 8 caracteres')
-      return
-    }
-
+    setUnconfirmedEmail(null)
+    setResendState('idle')
     setLoading(true)
     try {
-      await signUp(email, password, fullName)
-      // El trigger handle_new_user() crea el profile automáticamente.
-      navigate('/onboarding/crear-organizacion')
+      await signIn(email, password)
+      navigate('/dashboard')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo crear la cuenta')
+      if (err instanceof AuthError && err.code === 'email_not_confirmed') {
+        setUnconfirmedEmail(email)
+      } else {
+        setError(err instanceof Error ? err.message : 'No se pudo iniciar sesión')
+      }
     } finally {
       setLoading(false)
     }
   }
 
-  // signInWithOAuth() no distingue "login" de "registro": si el correo de
-  // Google/Microsoft no existe todavía, Supabase crea el usuario igual (vía
-  // el mismo trigger handle_new_user() de siempre) y AuthCallback ya sabe
-  // mandarlo a /onboarding/crear-organizacion por no tener organization_id.
+  async function handleResend() {
+    if (!unconfirmedEmail) return
+    setResending(true)
+    setResendState('idle')
+    try {
+      await resendSignupConfirmation(unconfirmedEmail)
+      setResendState('sent')
+    } catch {
+      setResendState('error')
+    } finally {
+      setResending(false)
+    }
+  }
+
   async function handleGoogle() {
     setError(null)
     try {
       await signInWithGoogle()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo continuar con Google')
+      setError(err instanceof Error ? err.message : 'No se pudo iniciar sesión con Google')
     }
   }
 
@@ -77,115 +96,134 @@ export default function Registro() {
     try {
       await signInWithMicrosoft()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo continuar con Microsoft')
+      setError(err instanceof Error ? err.message : 'No se pudo iniciar sesión con Microsoft')
     }
   }
 
   return (
     <div className="flex min-h-screen flex-col bg-surface">
       <div className="flex flex-1 items-center justify-center p-4">
-        <div className="w-full max-w-lg rounded-card bg-surface-card p-8 shadow-sm sm:p-10">
-          <div className="mb-6 flex items-center justify-between">
-            <Logo />
-            <select
-              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-600"
-              defaultValue="es"
-              aria-label="Idioma"
-            >
-              <option value="es">🌐 ES</option>
-            </select>
-          </div>
+        <div className="flex w-full max-w-4xl overflow-hidden rounded-card bg-surface-card shadow-sm">
+          <AuthHeroPanel />
 
-          <h1 className="text-2xl font-semibold text-primary">Crea tu cuenta</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Comienza a gestionar tu cartera con CrediPro. 15 días gratis, sin compromiso.
-          </p>
+          <div className="flex-1 p-8 sm:p-10">
+            <div className="mb-8 flex items-center justify-between">
+              <Logo />
+              <select
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-600"
+                defaultValue="es"
+                aria-label="Idioma"
+              >
+                <option value="es">🌐 ES</option>
+              </select>
+            </div>
 
-          <div className="mt-8">
-            <Stepper steps={ONBOARDING_STEPS} currentStep={1} />
-          </div>
+            <h1 className="text-2xl font-semibold text-primary">Bienvenido de nuevo</h1>
+            <p className="mt-1 text-sm text-slate-500">Inicia sesión para continuar en CrediPro</p>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <Input
-              id="fullName"
-              label="Nombre completo"
-              placeholder="Juan Pérez"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required
-            />
-            <Input
-              id="email"
-              type="email"
-              label="Correo electrónico"
-              placeholder="tu@empresa.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <PasswordInput
-              id="password"
-              label="Contraseña"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-            <PasswordInput
-              id="confirmPassword"
-              label="Confirmar contraseña"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-            />
-
-            <label className="flex items-start gap-2 text-sm text-slate-600">
-              <input
-                type="checkbox"
-                checked={acceptedTerms}
-                onChange={(e) => setAcceptedTerms(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-accent focus:ring-accent/30"
+            <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-4">
+              <Input
+                id="email"
+                type="email"
+                label="Correo electrónico"
+                placeholder="tu@empresa.com"
+                value={email}
+                onChange={(e) => updateEmail(e.target.value)}
+                required
               />
-              <span>
-                Acepto los{' '}
-                <Link to="/terminos" className="text-accent hover:underline">
-                  Términos y Condiciones
-                </Link>{' '}
-                y la{' '}
-                <Link to="/privacidad" className="text-accent hover:underline">
-                  Política de Privacidad
-                </Link>{' '}
-                de CrediPro.
-              </span>
-            </label>
+              <PasswordInput
+                id="password"
+                label="Contraseña"
+                placeholder="Ingresa tu contraseña"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
 
-            {error && <p className="text-sm text-status-danger">{error}</p>}
+              <div className="flex items-center justify-between text-sm">
+                <label className="flex items-center gap-2 text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={remember}
+                    onChange={(e) => setRemember(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-accent focus:ring-accent/30"
+                  />
+                  Recordarme
+                </label>
+                <Link to="/recuperar-contrasena" className="text-accent hover:underline">
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </div>
 
-            <Button type="submit" loading={loading} className="w-full">
-              Crear cuenta →
-            </Button>
+              {unconfirmedEmail && (
+                <div className="flex flex-col gap-2 rounded-lg border border-warning-100 bg-warning-100/60 p-3">
+                  <div className="flex items-start gap-2">
+                    <MailWarning size={16} className="mt-0.5 shrink-0 text-warning-600" />
+                    <p className="text-sm text-warning-700">
+                      Tu correo <span className="font-medium">{unconfirmedEmail}</span> todavía no ha sido
+                      verificado. Revisa tu bandeja de entrada o reenvía el correo de confirmación.
+                    </p>
+                  </div>
 
-            <div className="flex items-center gap-3 text-xs text-slate-400">
-              <div className="h-px flex-1 bg-slate-200" />
-              o continúa con
-              <div className="h-px flex-1 bg-slate-200" />
-            </div>
+                  {resendState === 'sent' ? (
+                    <p className="flex items-center gap-1.5 text-xs font-medium text-success-700">
+                      <CheckCircle2 size={14} /> Correo reenviado. Revisa tu bandeja de entrada (y spam).
+                    </p>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      loading={resending}
+                      onClick={handleResend}
+                      className="self-start"
+                    >
+                      Reenviar correo de verificación
+                    </Button>
+                  )}
+                  {resendState === 'error' && (
+                    <p className="text-xs text-status-danger">
+                      No se pudo reenviar el correo. Intenta de nuevo en unos minutos.
+                    </p>
+                  )}
+                </div>
+              )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <Button type="button" variant="secondary" onClick={handleGoogle}>
-                <GoogleIcon className="h-4 w-4" /> Google
+              {error && <p className="text-sm text-status-danger">{error}</p>}
+
+              <Button type="submit" loading={loading} className="w-full">
+                Iniciar sesión →
               </Button>
-              <Button type="button" variant="secondary" onClick={handleMicrosoft}>
-                <MicrosoftIcon className="h-4 w-4" /> Microsoft
-              </Button>
-            </div>
-          </form>
 
-          <p className="mt-6 text-center text-sm text-slate-500">
-            ¿Ya tienes una cuenta?{' '}
-            <Link to="/login" className="font-medium text-accent hover:underline">
-              Inicia sesión
-            </Link>
-          </p>
+              <div className="flex items-center gap-3 text-xs text-slate-400">
+                <div className="h-px flex-1 bg-slate-200" />
+                o continúa con
+                <div className="h-px flex-1 bg-slate-200" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Button type="button" variant="secondary" onClick={handleGoogle}>
+                  <GoogleIcon className="h-4 w-4" /> Google
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleMicrosoft}
+                  disabled
+                  title="Inicio de sesión con Microsoft deshabilitado temporalmente"
+                >
+                  <MicrosoftIcon className="h-4 w-4" /> Microsoft
+                </Button>
+              </div>
+            </form>
+
+            <p className="mt-6 text-center text-sm text-slate-500">
+              ¿No tienes una cuenta?{' '}
+              <Link to="/registro" className="font-medium text-accent hover:underline">
+                Crear cuenta
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
 
