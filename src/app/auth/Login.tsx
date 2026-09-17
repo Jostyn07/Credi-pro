@@ -69,6 +69,24 @@ export default function Login() {
     }
   }
 
+  async function handleGoogle() {
+    setError(null)
+    try {
+      await signInWithGoogle()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo iniciar sesión con Google')
+    }
+  }
+
+  async function handleMicrosoft() {
+    setError(null)
+    try {
+      await signInWithMicrosoft()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo iniciar sesión con Microsoft')
+    }
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-surface">
       <div className="flex flex-1 items-center justify-center p-4">
@@ -171,10 +189,10 @@ export default function Login() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <Button type="button" variant="secondary" onClick={signInWithGoogle}>
+                <Button type="button" variant="secondary" onClick={handleGoogle}>
                   <GoogleIcon className="h-4 w-4" /> Google
                 </Button>
-                <Button type="button" variant="secondary" onClick={signInWithMicrosoft}>
+                <Button type="button" variant="secondary" onClick={handleMicrosoft}>
                   <MicrosoftIcon className="h-4 w-4" /> Microsoft
                 </Button>
               </div>

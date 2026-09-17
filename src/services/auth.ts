@@ -33,20 +33,20 @@ export async function signInWithGoogle() {
       redirectTo: `${window.location.origin}/auth/callback`,
     },
   })
-
-  if (error) {
-    console.error(error)
-  }
+  // Antes esto solo hacía console.error(error) y no lanzaba nada: si Google no
+  // está habilitado o mal configurado en Supabase, el usuario simplemente se
+  // quedaba en /login sin ver ningún mensaje -- parecía que "no pasaba nada".
+  // Login.tsx y Registro.tsx sí capturan este throw y lo muestran.
+  if (error) throw error
 }
 
 // Supabase expone Microsoft (Azure AD) como proveedor "azure"
 export async function signInWithMicrosoft() {
-  const { data, error } = await supabase.auth.signInWithOAuth({
+  const { error } = await supabase.auth.signInWithOAuth({
     provider: 'azure',
-    options: { redirectTo: `${window.location.origin}/dashboard` },
+    options: { redirectTo: `${window.location.origin}/auth/callback` },
   })
   if (error) throw error
-  return data
 }
 
 export async function requestPasswordReset(email: string) {

@@ -61,6 +61,7 @@ export interface CreateLoanInput {
   graceDays?: number
   lateFeeRate?: number
   disbursementMethod?: string
+  notes?: string
 }
 
 // Vista previa del calendario SIN crear el préstamo — usada en el wizard
@@ -95,6 +96,28 @@ export async function createLoan(input: CreateLoanInput): Promise<Loan> {
     p_grace_days: input.graceDays ?? 0,
     p_late_fee_rate: input.lateFeeRate ?? 0,
     p_disbursement_method: input.disbursementMethod ?? null,
+    p_notes: input.notes ?? null,
+  })
+  if (error) throw error
+  return data as unknown as Loan
+}
+
+// Guarda el préstamo con estado 'draft': cliente + condiciones, sin
+// desembolso ni cuotas todavía. Requiere la migración
+// supabase/migrations/20260917_loan_notes_and_drafts.sql.
+export async function saveLoanDraft(input: CreateLoanInput): Promise<Loan> {
+  const { data, error } = await supabase.rpc('save_loan_draft', {
+    p_client_id: input.clientId,
+    p_principal: input.principal,
+    p_interest_rate: input.interestRate,
+    p_interest_modality: input.interestModality,
+    p_term_months: input.termMonths,
+    p_disbursement_date: input.disbursementDate,
+    p_first_payment_date: input.firstPaymentDate,
+    p_payment_day: input.paymentDay,
+    p_grace_days: input.graceDays ?? 0,
+    p_late_fee_rate: input.lateFeeRate ?? 0,
+    p_notes: input.notes ?? null,
   })
   if (error) throw error
   return data as unknown as Loan

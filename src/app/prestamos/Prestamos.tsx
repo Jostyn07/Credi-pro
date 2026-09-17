@@ -14,6 +14,15 @@ const statusTone: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> =
   draft: 'neutral',
 }
 
+const statusLabel: Record<string, string> = {
+  active: 'Activo',
+  liquidated: 'Liquidado',
+  cancelled: 'Cancelado',
+  refinanced: 'Refinanciado',
+  restructured: 'Reestructurado',
+  draft: 'Borrador',
+}
+
 export default function Prestamos() {
   const [loans, setLoans] = useState<Loan[]>([])
   const [loading, setLoading] = useState(true)
@@ -52,7 +61,7 @@ export default function Prestamos() {
             {
               key: 'status',
               header: 'Estado',
-              render: (row) => <Badge tone={statusTone[row.status] ?? 'neutral'}>{row.status}</Badge>,
+              render: (row) => <Badge tone={statusTone[row.status] ?? 'neutral'}>{statusLabel[row.status] ?? row.status}</Badge>,
             },
             {
               key: 'actions',

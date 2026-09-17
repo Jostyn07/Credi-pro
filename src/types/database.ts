@@ -63,6 +63,23 @@ export type Database = {
           p_grace_days?: number
           p_late_fee_rate?: number
           p_disbursement_method?: string | null
+          p_notes?: string | null
+        }
+        Returns: Record<string, unknown>
+      }
+      save_loan_draft: {
+        Args: {
+          p_client_id: string
+          p_principal: number
+          p_interest_rate: number
+          p_interest_modality: string
+          p_term_months: number
+          p_disbursement_date: string
+          p_first_payment_date: string
+          p_payment_day: number
+          p_grace_days?: number
+          p_late_fee_rate?: number
+          p_notes?: string | null
         }
         Returns: Record<string, unknown>
       }

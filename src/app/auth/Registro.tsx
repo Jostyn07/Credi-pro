@@ -6,7 +6,8 @@ import { PasswordInput } from '@/components/ui/PasswordInput'
 import { Logo } from '@/components/ui/Logo'
 import { AuthFooter } from '@/components/ui/AuthFooter'
 import { Stepper, ONBOARDING_STEPS } from '@/components/ui/Stepper'
-import { signUp } from '@/services/auth'
+import { GoogleIcon, MicrosoftIcon } from '@/components/ui/BrandIcons'
+import { signUp, signInWithGoogle, signInWithMicrosoft } from '@/services/auth'
 
 export default function Registro() {
   const navigate = useNavigate()
@@ -44,6 +45,28 @@ export default function Registro() {
       setError(err instanceof Error ? err.message : 'No se pudo crear la cuenta')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // signInWithOAuth() no distingue "login" de "registro": si el correo de
+  // Google/Microsoft no existe todavía, Supabase crea el usuario igual (vía
+  // el mismo trigger handle_new_user() de siempre) y AuthCallback ya sabe
+  // mandarlo a /onboarding/crear-organizacion por no tener organization_id.
+  async function handleGoogle() {
+    setError(null)
+    try {
+      await signInWithGoogle()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo continuar con Google')
+    }
+  }
+
+  async function handleMicrosoft() {
+    setError(null)
+    try {
+      await signInWithMicrosoft()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo continuar con Microsoft')
     }
   }
 
@@ -129,6 +152,21 @@ export default function Registro() {
             <Button type="submit" loading={loading} className="w-full">
               Crear cuenta →
             </Button>
+
+            <div className="flex items-center gap-3 text-xs text-slate-400">
+              <div className="h-px flex-1 bg-slate-200" />
+              o continúa con
+              <div className="h-px flex-1 bg-slate-200" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Button type="button" variant="secondary" onClick={handleGoogle}>
+                <GoogleIcon className="h-4 w-4" /> Google
+              </Button>
+              <Button type="button" variant="secondary" onClick={handleMicrosoft}>
+                <MicrosoftIcon className="h-4 w-4" /> Microsoft
+              </Button>
+            </div>
           </form>
 
           <p className="mt-6 text-center text-sm text-slate-500">

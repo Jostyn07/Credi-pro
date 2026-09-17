@@ -171,6 +171,59 @@ export async function getClientProfileSummary(clientId: string): Promise<ClientP
   }
 }
 
+export interface ClientEvaluationMetrics {
+  paidInstallmentsCount: number
+  onTimePct: number | null // null = sin cuotas pagadas todavía (no hay de dónde sacar el dato)
+  avgDaysLate: number | null
+}
+
+// No existe una columna "paid_at" en installments; usamos updated_at como el
+// momento en que la cuota pasó a 'paid', porque register_payment() lo
+// actualiza justo en ese instante. Es una aproximación razonable a partir de
+// datos reales (no un registro de auditoría exacto), y se documenta como tal
+// en la UI que la consume.
+export async function getClientEvaluationMetrics(clientId: string): Promise<ClientEvaluationMetrics> {
+  const { data: loansRaw } = await supabase.from('loans').select('id').eq('client_id', clientId)
+  const loanIds = ((loansRaw ?? []) as any[]).map((l) => l.id)
+  if (loanIds.length === 0) {
+    return { paidInstallmentsCount: 0, onTimePct: null, avgDaysLate: null }
+  }
+
+  const { data } = await supabase
+    .from('installments')
+    .select('due_date, updated_at')
+    .in('loan_id', loanIds)
+    .eq('status', 'paid')
+
+  const rows = (data ?? []) as any[]
+  if (rows.length === 0) {
+    return { paidInstallmentsCount: 0, onTimePct: null, avgDaysLate: null }
+  }
+
+  let onTime = 0
+  let totalDaysLate = 0
+  for (const r of rows) {
+    const due = new Date(r.due_date)
+    const paidAt = new Date(r.updated_at)
+    const daysLate = Math.max(
+      0,
+      Math.round(
+        (Date.UTC(paidAt.getFullYear(), paidAt.getMonth(), paidAt.getDate()) -
+          Date.UTC(due.getFullYear(), due.getMonth(), due.getDate())) /
+          (1000 * 60 * 60 * 24),
+      ),
+    )
+    if (daysLate === 0) onTime += 1
+    totalDaysLate += daysLate
+  }
+
+  return {
+    paidInstallmentsCount: rows.length,
+    onTimePct: Math.round((onTime / rows.length) * 100),
+    avgDaysLate: Math.round((totalDaysLate / rows.length) * 10) / 10,
+  }
+}
+
 export interface ClientStats {
   total: StatWithChange
   active: StatWithChange
