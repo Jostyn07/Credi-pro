@@ -35,6 +35,7 @@ import PrestamoDetalle from '@/app/prestamos/PrestamoDetalle'
 import RegistrarPago from '@/app/prestamos/RegistrarPago'
 import LiquidacionTotal from '@/app/prestamos/LiquidacionTotal'
 import Pagos from '@/app/pagos/Pagos'
+import AdminDashboard from '@/app/admin/Dashboard'
 import { AppLayout } from '@/components/AppLayout'
 import { RequireAuth, RequireOrganization, RequirePlatformAdmin } from '@/components/RouteGuard'
 
@@ -140,7 +141,7 @@ export default function App() {
         path="/admin/dashboard"
         element={
           <RequirePlatformAdmin>
-            <Placeholder title="Panel de administración general" />
+            <AdminDashboard />
           </RequirePlatformAdmin>
         }
       />
