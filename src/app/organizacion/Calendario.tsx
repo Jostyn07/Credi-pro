@@ -42,6 +42,7 @@ export default function Calendario() {
   const [loading, setLoading] = useState(true)
   const [estadoFilter, setEstadoFilter] = useState('todos')
   const [search, setSearch] = useState('')
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
   const [monthSummary, setMonthSummary] = useState<{
     totalCount: number
@@ -70,6 +71,7 @@ export default function Calendario() {
 
   useEffect(() => {
     setLoading(true)
+    setSelectedDate(null)
     getInstallmentsByRange(toISODate(rangeStart), toISODate(rangeEnd))
       .then(setInstallments)
       .finally(() => setLoading(false))
@@ -158,13 +160,16 @@ export default function Calendario() {
     const dayInstallments = byDate.get(iso) ?? []
     const total = dayInstallments.reduce((s, x) => s + x.capital + x.interest, 0)
     const isToday = iso === toISODate(new Date())
+    const isSelected = iso === selectedDate
     return (
-      <div
+      <button
         key={iso}
+        type="button"
+        onClick={() => setSelectedDate(isSelected ? null : iso)}
         className={cn(
-          'flex min-h-[80px] flex-col rounded-lg border p-1.5 text-left text-xs',
-          'border-neutral-200',
-          isToday && 'ring-1 ring-accent',
+          'flex min-h-[80px] flex-col rounded-lg border p-1.5 text-left text-xs hover:border-primary-500',
+          isSelected ? 'border-accent bg-accent/5' : 'border-neutral-200',
+          isToday && !isSelected && 'ring-1 ring-accent',
         )}
       >
         <span className="font-medium text-primary">{day.getDate()}</span>
@@ -174,7 +179,7 @@ export default function Calendario() {
             <span className="truncate text-neutral-400">{formatCOP(total)}</span>
           </>
         )}
-      </div>
+      </button>
     )
   }
 
@@ -303,6 +308,51 @@ export default function Calendario() {
         </Card>
 
         <div className="flex flex-col gap-6">
+          {selectedDate && view !== 'diaria' && (
+            <Card>
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-medium text-primary capitalize">
+                  {new Date(selectedDate + 'T00:00:00').toLocaleDateString('es-CO', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long',
+                  })}
+                </p>
+                <button
+                  onClick={() => setSelectedDate(null)}
+                  className="text-xs font-medium text-neutral-400 hover:text-primary"
+                >
+                  Cerrar ✕
+                </button>
+              </div>
+              {(byDate.get(selectedDate) ?? []).length === 0 ? (
+                <p className="text-sm text-neutral-400">No hay cuotas programadas este día.</p>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {(byDate.get(selectedDate) ?? []).map((inst) => (
+                    <li key={inst.id}>
+                      <Link
+                        to={`/prestamos/${inst.loan_id}`}
+                        className="block rounded-lg border border-neutral-200 p-2.5 hover:border-primary-500"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-primary">{inst.loans?.clients?.full_name}</span>
+                          <Badge tone={inst.status === 'overdue' ? 'danger' : 'neutral'}>
+                            {statusLabel[inst.status]}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-neutral-400">
+                          {inst.loans?.loan_number} · Cuota {inst.number}
+                        </p>
+                        <p className="mt-1 text-sm font-medium text-primary">{formatCOP(inst.capital + inst.interest)}</p>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          )}
+
           <Card>
             <p className="mb-3 text-sm font-medium text-primary">Resumen del mes</p>
             {!monthSummary ? (
