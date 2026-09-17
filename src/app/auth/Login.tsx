@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AuthError } from '@supabase/supabase-js'
 import { MailWarning, CheckCircle2 } from 'lucide-react'
@@ -10,14 +10,27 @@ import { AuthHeroPanel } from '@/components/ui/AuthHeroPanel'
 import { AuthFooter } from '@/components/ui/AuthFooter'
 import { GoogleIcon, MicrosoftIcon } from '@/components/ui/BrandIcons'
 import { signIn, signInWithGoogle, signInWithMicrosoft, resendSignupConfirmation } from '@/services/auth'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function Login() {
   const navigate = useNavigate()
+  const { session, profile, loading: authLoading } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  // Si al entrar aquí ya hay una sesión activa (típicamente después de un
+  // login OAuth: Google/Supabase redirige de vuelta y, si /auth/callback no
+  // está en la lista de Redirect URLs permitidas de Supabase, cae de vuelta
+  // en el Site URL configurado -- que muchas veces es /login), lo mandamos
+  // para adelante en vez de dejarlo mirando el formulario de login otra vez.
+  useEffect(() => {
+    if (!authLoading && session) {
+      navigate(profile?.organization_id ? '/dashboard' : '/onboarding/crear-organizacion', { replace: true })
+    }
+  }, [authLoading, session, profile, navigate])
 
   // Cuando signIn() falla porque el correo no está confirmado, Supabase
   // devuelve error.code === 'email_not_confirmed' en vez del genérico

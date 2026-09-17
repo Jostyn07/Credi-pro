@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -8,9 +8,11 @@ import { AuthFooter } from '@/components/ui/AuthFooter'
 import { Stepper, ONBOARDING_STEPS } from '@/components/ui/Stepper'
 import { GoogleIcon, MicrosoftIcon } from '@/components/ui/BrandIcons'
 import { signUp, signInWithGoogle, signInWithMicrosoft } from '@/services/auth'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function Registro() {
   const navigate = useNavigate()
+  const { session, profile, loading: authLoading } = useAuth()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -18,6 +20,15 @@ export default function Registro() {
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  // Mismo caso que en Login.tsx: si Google/Microsoft ya autenticó al usuario
+  // pero el flujo cayó de vuelta aquí en vez de en /auth/callback, lo
+  // mandamos para adelante en vez de dejarlo viendo el formulario otra vez.
+  useEffect(() => {
+    if (!authLoading && session) {
+      navigate(profile?.organization_id ? '/dashboard' : '/onboarding/crear-organizacion', { replace: true })
+    }
+  }, [authLoading, session, profile, navigate])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
