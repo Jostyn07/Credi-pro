@@ -112,3 +112,15 @@ export async function getRecentPayments(limit = 10): Promise<Payment[]> {
   if (error) throw error
   return data as unknown as Payment[]
 }
+
+// Para el "Resumen del mes" del Calendario: pagos reales recibidos en el
+// rango, no cuotas -- un pago puede cubrir varias cuotas o solo una parte.
+export async function getPaymentsByDateRange(startDate: string, endDate: string): Promise<Payment[]> {
+  const { data, error } = await supabase
+    .from('payments')
+    .select('*')
+    .gte('payment_date', startDate)
+    .lte('payment_date', endDate)
+  if (error) throw error
+  return data as unknown as Payment[]
+}
