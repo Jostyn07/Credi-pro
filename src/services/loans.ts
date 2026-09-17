@@ -18,8 +18,9 @@ export interface Loan {
   client_id: string
   loan_number: string
   status: LoanStatus
+  notes: string | null
   created_at: string
-  clients?: { full_name: string }
+  clients?: { full_name: string; identification: string | null }
 }
 
 export interface LoanConditions {
@@ -126,14 +127,14 @@ export async function saveLoanDraft(input: CreateLoanInput): Promise<Loan> {
 export async function getLoans(): Promise<Loan[]> {
   const { data, error } = await supabase
     .from('loans')
-    .select('*, clients(full_name)')
+    .select('*, clients(full_name, identification)')
     .order('created_at', { ascending: false })
   if (error) throw error
   return data as unknown as Loan[]
 }
 
 export async function getLoan(id: string): Promise<Loan> {
-  const { data, error } = await supabase.from('loans').select('*, clients(full_name)').eq('id', id).single()
+  const { data, error } = await supabase.from('loans').select('*, clients(full_name, identification)').eq('id', id).single()
   if (error) throw error
   return data as unknown as Loan
 }
