@@ -9,6 +9,7 @@ export interface CollectionAction {
   notes: string | null
   action_date: string
   clients?: { full_name: string }
+  loans?: { loan_number: string }
 }
 
 export interface PaymentPromise {
@@ -24,7 +25,7 @@ export interface PaymentPromise {
 export async function getCollectionActions(clientId?: string, loanId?: string): Promise<CollectionAction[]> {
   let query = supabase
     .from('collection_actions')
-    .select('*, clients(full_name)')
+    .select('*, clients(full_name), loans(loan_number)')
     .order('action_date', { ascending: false })
   if (clientId) query = query.eq('client_id', clientId)
   if (loanId) query = query.eq('loan_id', loanId)

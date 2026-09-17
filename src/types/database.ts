@@ -101,6 +101,7 @@ export type Database = {
           p_notes?: string | null
           p_prepayment_strategy?: string | null
           p_account_id?: string | null
+          p_account_splits?: Record<string, unknown>[] | null
         }
         Returns: Record<string, unknown>
       }
@@ -166,6 +167,18 @@ export type Database = {
       get_org_auth_events: {
         Args: { p_limit?: number }
         Returns: { user_id: string; event_type: string; ip_address: string | null; created_at: string }[]
+      }
+      get_platform_summary: {
+        Args: Record<string, never>
+        Returns: Record<string, unknown>[]
+      }
+      get_platform_organizations: {
+        Args: Record<string, never>
+        Returns: Record<string, unknown>[]
+      }
+      get_platform_recent_sign_ins: {
+        Args: { p_limit?: number }
+        Returns: Record<string, unknown>[]
       }
       has_permission: {
         Args: { permission_key: string }

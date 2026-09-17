@@ -9,8 +9,10 @@ import {
   getCollectionWorklist,
   getPaymentPromises,
   updatePaymentPromiseStatus,
+  getCollectionActions,
   type CollectionRow,
   type PaymentPromise,
+  type CollectionAction,
 } from '@/services/collection'
 import { getClients, type Client } from '@/services/clients'
 import { RegistrarGestionModal } from './RegistrarGestionModal'
@@ -30,8 +32,24 @@ const TABS = [
   { key: 'por_vencer', label: 'Por vencer' },
   { key: 'en_gracia', label: 'En gracia' },
   { key: 'promesas', label: 'Promesas de pago' },
+  { key: 'historial', label: 'Gestiones registradas' },
 ] as const
 type TabKey = (typeof TABS)[number]['key']
+
+const actionTypeLabel: Record<string, string> = {
+  whatsapp: 'WhatsApp',
+  llamada: 'Llamada',
+  visita: 'Visita',
+  email: 'Correo',
+  otro: 'Otro',
+}
+const resultLabel: Record<string, string> = {
+  contestado: 'Contestó',
+  no_contesto: 'No contestó',
+  mensaje_dejado: 'Mensaje dejado',
+  promesa_pago: 'Prometió pagar',
+  otro: 'Otro',
+}
 
 const estadoTone: Record<CollectionRow['estado'], 'danger' | 'warning' | 'info'> = {
   en_mora: 'danger',
@@ -53,6 +71,7 @@ export default function Cobranza() {
   const [tab, setTab] = useState<TabKey>(TABS.some((t) => t.key === initialTab) ? initialTab : 'cartera_vencida')
   const [worklist, setWorklist] = useState<CollectionRow[]>([])
   const [promises, setPromises] = useState<PaymentPromise[]>([])
+  const [actions, setActions] = useState<CollectionAction[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -65,13 +84,15 @@ export default function Cobranza() {
   const [pickerSearch, setPickerSearch] = useState('')
 
   const loadData = useCallback(async () => {
-    const [worklistData, promisesData, clientsData] = await Promise.all([
+    const [worklistData, promisesData, actionsData, clientsData] = await Promise.all([
       getCollectionWorklist(),
       getPaymentPromises(),
+      getCollectionActions(),
       getClients(),
     ])
     setWorklist(worklistData)
     setPromises(promisesData)
+    setActions(actionsData)
     setClients(clientsData)
   }, [])
 
@@ -164,7 +185,7 @@ export default function Cobranza() {
         ))}
       </div>
 
-      {tab !== 'promesas' && (
+      {tab !== 'promesas' && tab !== 'historial' && (
         <div className="mb-4 flex flex-wrap gap-3">
           <select
             className="h-10 rounded-lg border border-neutral-300 px-3 text-sm text-primary"
@@ -192,6 +213,31 @@ export default function Cobranza() {
         <div className="flex justify-center py-16">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
         </div>
+      ) : tab === 'historial' ? (
+        <Table
+          columns={[
+            { key: 'cliente', header: 'Cliente', render: (r: CollectionAction) => r.clients?.full_name ?? '—' },
+            {
+              key: 'prestamo',
+              header: 'Préstamo',
+              render: (r: CollectionAction) =>
+                r.loan_id ? (
+                  <Link to={`/prestamos/${r.loan_id}`} className="text-accent hover:underline">
+                    {r.loans?.loan_number ?? '—'}
+                  </Link>
+                ) : (
+                  '—'
+                ),
+            },
+            { key: 'tipo', header: 'Tipo', render: (r: CollectionAction) => actionTypeLabel[r.action_type] ?? r.action_type },
+            { key: 'resultado', header: 'Resultado', render: (r: CollectionAction) => resultLabel[r.result] ?? r.result },
+            { key: 'notas', header: 'Notas', render: (r: CollectionAction) => r.notes ?? '—' },
+            { key: 'fecha', header: 'Fecha', render: (r: CollectionAction) => formatDate(r.action_date) },
+          ]}
+          data={actions}
+          rowKey={(r) => r.id}
+          emptyMessage="Todavía no se han registrado gestiones de cobranza"
+        />
       ) : tab === 'promesas' ? (
         promises.length === 0 ? (
           <Card className="text-sm text-neutral-400">No hay promesas de pago registradas.</Card>

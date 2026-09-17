@@ -14,6 +14,11 @@ export interface Payment {
   loans?: { loan_number: string; clients?: { full_name: string } }
 }
 
+export interface PaymentAccountSplit {
+  accountId: string
+  amount: number
+}
+
 export interface RegisterPaymentInput {
   loanId: string
   amount: number
@@ -23,6 +28,8 @@ export interface RegisterPaymentInput {
   notes?: string
   prepaymentStrategy?: PrepaymentStrategy
   accountId?: string
+  // Si se manda, tiene prioridad sobre accountId y debe sumar exactamente `amount`.
+  accountSplits?: PaymentAccountSplit[]
 }
 
 export type PrepaymentStrategy = 'none' | 'reduce_term' | 'reduce_installment'
@@ -57,6 +64,7 @@ export async function previewPaymentAllocation(
 export const PREPAYMENT_STRATEGY_REQUIRED_PREFIX = 'PREPAYMENT_STRATEGY_REQUIRED:'
 
 export async function registerPayment(input: RegisterPaymentInput): Promise<Payment> {
+  const hasSplits = !!input.accountSplits && input.accountSplits.length > 0
   const { data, error } = await supabase.rpc('register_payment', {
     p_loan_id: input.loanId,
     p_amount: input.amount,
@@ -65,7 +73,10 @@ export async function registerPayment(input: RegisterPaymentInput): Promise<Paym
     p_reference: input.reference ?? null,
     p_notes: input.notes ?? null,
     p_prepayment_strategy: input.prepaymentStrategy ?? null,
-    p_account_id: input.accountId ?? null,
+    p_account_id: hasSplits ? null : input.accountId ?? null,
+    p_account_splits: hasSplits
+      ? input.accountSplits!.map((s) => ({ account_id: s.accountId, amount: s.amount }))
+      : null,
   })
   if (error) throw error
   return data as unknown as Payment

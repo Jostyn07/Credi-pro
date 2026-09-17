@@ -58,6 +58,11 @@ export default function RegistrarPago() {
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10))
   const [paymentMethod, setPaymentMethod] = useState('transferencia')
   const [accountId, setAccountId] = useState('')
+  const [splitMode, setSplitMode] = useState(false)
+  const [splits, setSplits] = useState<{ accountId: string; amount: string }[]>([
+    { accountId: '', amount: '' },
+    { accountId: '', amount: '' },
+  ])
   const [reference, setReference] = useState('')
   const [notes, setNotes] = useState('')
 
@@ -121,8 +126,26 @@ export default function RegistrarPago() {
     }
   }
 
+  const splitsTotal = splits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0)
+  const splitsMismatch = splitMode && Number(amount) > 0 && Math.abs(splitsTotal - Number(amount)) > 0.01
+
+  function updateSplit(index: number, field: 'accountId' | 'amount', value: string) {
+    setSplits((prev) => prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)))
+  }
+
+  function addSplitRow() {
+    setSplits((prev) => [...prev, { accountId: '', amount: '' }])
+  }
+
+  function removeSplitRow(index: number) {
+    setSplits((prev) => prev.filter((_, i) => i !== index))
+  }
+
   async function submitPayment(prepaymentStrategy?: PrepaymentStrategy) {
     if (!id) return
+    const activeSplits = splitMode
+      ? splits.filter((s) => s.accountId && Number(s.amount) > 0).map((s) => ({ accountId: s.accountId, amount: Number(s.amount) }))
+      : []
     await registerPayment({
       loanId: id,
       amount: Number(amount),
@@ -130,7 +153,8 @@ export default function RegistrarPago() {
       paymentMethod,
       reference: reference || undefined,
       notes: notes || undefined,
-      accountId: accountId || undefined,
+      accountId: splitMode ? undefined : accountId || undefined,
+      accountSplits: activeSplits.length > 0 ? activeSplits : undefined,
       prepaymentStrategy,
     })
     navigate(`/prestamos/${id}`)
@@ -139,6 +163,10 @@ export default function RegistrarPago() {
   async function handleSubmit() {
     if (!id) return
     setError(null)
+    if (splitsMismatch) {
+      setError('La suma de las cajas no coincide con el monto a pagar.')
+      return
+    }
     setSubmitting(true)
     try {
       const p = await previewPaymentAllocation(id, Number(amount), paymentDate)
@@ -266,23 +294,85 @@ export default function RegistrarPago() {
                       <option value="otro">Otro</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-primary">Cuenta</label>
-                    <select
-                      className="mt-1.5 h-10 w-full rounded-lg border border-neutral-300 px-3 text-sm text-primary disabled:bg-neutral-50 disabled:text-neutral-400"
-                      value={accountId}
-                      onChange={(e) => setAccountId(e.target.value)}
-                      disabled={accounts.length === 0}
-                    >
-                      <option value="">{accounts.length === 0 ? 'Sin cuentas de caja' : 'Sin asignar'}</option>
-                      {accounts.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {!splitMode && (
+                    <div>
+                      <label className="text-sm font-medium text-primary">Cuenta</label>
+                      <select
+                        className="mt-1.5 h-10 w-full rounded-lg border border-neutral-300 px-3 text-sm text-primary disabled:bg-neutral-50 disabled:text-neutral-400"
+                        value={accountId}
+                        onChange={(e) => setAccountId(e.target.value)}
+                        disabled={accounts.length === 0}
+                      >
+                        <option value="">{accounts.length === 0 ? 'Sin cuentas de caja' : 'Sin asignar'}</option>
+                        {accounts.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
+
+                {accounts.length >= 2 && (
+                  <button
+                    type="button"
+                    onClick={() => setSplitMode((v) => !v)}
+                    className="self-start text-xs font-medium text-accent hover:underline"
+                  >
+                    {splitMode ? '← Usar una sola caja' : 'Dividir este pago entre varias cajas'}
+                  </button>
+                )}
+
+                {splitMode && (
+                  <div className="flex flex-col gap-3 rounded-lg border border-neutral-200 p-3">
+                    <p className="text-xs font-medium text-neutral-500">
+                      El pago queda como un solo registro; solo se reparten los movimientos de caja.
+                    </p>
+                    {splits.map((s, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <select
+                          className="h-10 flex-1 rounded-lg border border-neutral-300 px-3 text-sm text-primary"
+                          value={s.accountId}
+                          onChange={(e) => updateSplit(i, 'accountId', e.target.value)}
+                        >
+                          <option value="">Selecciona una caja</option>
+                          {accounts.map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.name}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          value={s.amount}
+                          onChange={(e) => updateSplit(i, 'amount', e.target.value)}
+                          placeholder="Monto"
+                          className="h-10 w-32 rounded-lg border border-neutral-300 px-3 text-sm text-primary"
+                        />
+                        {splits.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={() => removeSplitRow(i)}
+                            className="text-xs text-neutral-400 hover:text-status-danger"
+                          >
+                            Quitar
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={addSplitRow}
+                      className="self-start text-xs font-medium text-accent hover:underline"
+                    >
+                      + Agregar otra caja
+                    </button>
+                    <p className={`text-xs ${splitsMismatch ? 'text-status-danger' : 'text-neutral-400'}`}>
+                      Suma: {formatCOP(splitsTotal)} de {formatCOP(Number(amount) || 0)} a pagar
+                    </p>
+                  </div>
+                )}
 
                 <Input label="Referencia (opcional)" value={reference} onChange={(e) => setReference(e.target.value)} />
                 <Input label="Notas (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
@@ -295,7 +385,7 @@ export default function RegistrarPago() {
                   </Button>
                   <Button
                     loading={submitting}
-                    disabled={!amount || Number(amount) <= 0}
+                    disabled={!amount || Number(amount) <= 0 || splitsMismatch}
                     onClick={handleSubmit}
                     className="flex-1"
                   >
