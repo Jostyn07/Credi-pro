@@ -30,6 +30,7 @@ import {
 } from '@/services/clients'
 import { createLoan, saveLoanDraft, previewAmortization, type AmortizationRow, type InterestModality } from '@/services/loans'
 import { generateContract } from '@/services/contracts'
+import { getAccounts, type Account } from '@/services/accounts'
 import { QuickNewClientModal } from './QuickNewClientModal'
 
 const STEPS = [
@@ -133,6 +134,10 @@ export default function NuevoPrestamo() {
   const [loadingSchedule, setLoadingSchedule] = useState(false)
   const [showFullSchedule, setShowFullSchedule] = useState(false)
 
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [accountId, setAccountId] = useState('')
+  const [loadingAccounts, setLoadingAccounts] = useState(true)
+
   const [generateContractDoc, setGenerateContractDoc] = useState(true)
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -141,6 +146,12 @@ export default function NuevoPrestamo() {
 
   useEffect(() => {
     getClients().then(setClients)
+    getAccounts()
+      .then((accs) => {
+        setAccounts(accs)
+        if (accs.length === 1) setAccountId(accs[0].id)
+      })
+      .finally(() => setLoadingAccounts(false))
   }, [])
 
   const selectedClient = clients.find((c) => c.id === clientId)
@@ -206,6 +217,10 @@ export default function NuevoPrestamo() {
 
   function goToStep3() {
     setError(null)
+    if (!accountId) {
+      setError('Selecciona la cuenta de caja desde la que se desembolsará el préstamo')
+      return
+    }
     if (!firstPaymentDate) {
       setError('Selecciona la fecha de la primera cuota')
       return
@@ -226,6 +241,7 @@ export default function NuevoPrestamo() {
         disbursementDate,
         firstPaymentDate,
         paymentDay,
+        accountId,
         graceDays,
         lateFeeRate,
         notes: notes || undefined,
@@ -285,6 +301,19 @@ export default function NuevoPrestamo() {
         <h1 className="mb-6 text-xl font-semibold text-primary">Nuevo préstamo</h1>
 
         <Card>
+          {!loadingAccounts && accounts.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-10 text-center">
+              <p className="text-sm font-medium text-primary">
+                Necesitas crear al menos una cuenta de caja antes de registrar un préstamo.
+              </p>
+              <p className="max-w-sm text-xs text-neutral-500">
+                Todo desembolso sale de una cuenta real (efectivo, banco, billetera) para que tu caja siempre
+                cuadre. Crea la primera cuenta y vuelve aquí.
+              </p>
+              <Button onClick={() => navigate('/caja')}>Ir a Caja</Button>
+            </div>
+          ) : (
+          <>
           <Stepper steps={STEPS} currentStep={step} />
 
           {step === 1 && (
@@ -526,6 +555,25 @@ export default function NuevoPrestamo() {
                     value={firstPaymentDate}
                     onChange={(e) => setFirstPaymentDate(e.target.value)}
                   />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-primary">Cuenta de desembolso</label>
+                  <select
+                    className="mt-1.5 h-10 w-full rounded-lg border border-neutral-300 px-3 text-sm text-primary"
+                    value={accountId}
+                    onChange={(e) => setAccountId(e.target.value)}
+                  >
+                    <option value="">Selecciona una cuenta...</option>
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-neutral-400">
+                    El monto se descontará automáticamente de esta cuenta al crear el préstamo.
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -848,6 +896,8 @@ export default function NuevoPrestamo() {
                 </div>
               </div>
             </div>
+          )}
+          </>
           )}
         </Card>
       </div>

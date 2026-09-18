@@ -59,12 +59,16 @@ export interface CreateLoanInput {
   disbursementDate: string
   firstPaymentDate: string
   paymentDay: number
+  accountId: string
   graceDays?: number
   lateFeeRate?: number
   disbursementMethod?: string
   notes?: string
 }
 
+// Un borrador aún no se desembolsa, así que no exige cuenta de caja todavía
+// (esa decisión se toma cuando el préstamo pasa a activo de verdad).
+export type SaveLoanDraftInput = Omit<CreateLoanInput, 'accountId'>
 // Vista previa del calendario SIN crear el préstamo — usada en el wizard
 export async function previewAmortization(
   principal: number,
@@ -94,6 +98,7 @@ export async function createLoan(input: CreateLoanInput): Promise<Loan> {
     p_disbursement_date: input.disbursementDate,
     p_first_payment_date: input.firstPaymentDate,
     p_payment_day: input.paymentDay,
+    p_account_id: input.accountId,
     p_grace_days: input.graceDays ?? 0,
     p_late_fee_rate: input.lateFeeRate ?? 0,
     p_disbursement_method: input.disbursementMethod ?? null,
@@ -104,9 +109,9 @@ export async function createLoan(input: CreateLoanInput): Promise<Loan> {
 }
 
 // Guarda el préstamo con estado 'draft': cliente + condiciones, sin
-// desembolso ni cuotas todavía. Requiere la migración
-// supabase/migrations/20260917_loan_notes_and_drafts.sql.
-export async function saveLoanDraft(input: CreateLoanInput): Promise<Loan> {
+// desembolso ni cuotas todavía. Requiere crear la función save_loan_draft()
+// en Supabase, la migración 0009_loan_drafts.sql.
+export async function saveLoanDraft(input: SaveLoanDraftInput): Promise<Loan> {
   const { data, error } = await supabase.rpc('save_loan_draft', {
     p_client_id: input.clientId,
     p_principal: input.principal,
@@ -119,6 +124,18 @@ export async function saveLoanDraft(input: CreateLoanInput): Promise<Loan> {
     p_grace_days: input.graceDays ?? 0,
     p_late_fee_rate: input.lateFeeRate ?? 0,
     p_notes: input.notes ?? null,
+  })
+  if (error) throw error
+  return data as unknown as Loan
+}
+
+// Aprueba un préstamo en borrador: exige cuenta de caja, genera el
+// desembolso, el movimiento de caja y las cuotas — recién ahí queda 'active'.
+export async function activateLoanDraft(loanId: string, accountId: string, disbursementMethod?: string): Promise<Loan> {
+  const { data, error } = await supabase.rpc('activate_loan_draft', {
+    p_loan_id: loanId,
+    p_account_id: accountId,
+    p_disbursement_method: disbursementMethod ?? null,
   })
   if (error) throw error
   return data as unknown as Loan

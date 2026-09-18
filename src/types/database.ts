@@ -60,10 +60,19 @@ export type Database = {
           p_disbursement_date: string
           p_first_payment_date: string
           p_payment_day: number
+          p_account_id: string
           p_grace_days?: number
           p_late_fee_rate?: number
           p_disbursement_method?: string | null
           p_notes?: string | null
+        }
+        Returns: Record<string, unknown>
+      }
+      activate_loan_draft: {
+        Args: {
+          p_loan_id: string
+          p_account_id: string
+          p_disbursement_method?: string | null
         }
         Returns: Record<string, unknown>
       }
@@ -100,7 +109,6 @@ export type Database = {
           p_reference?: string | null
           p_notes?: string | null
           p_prepayment_strategy?: string | null
-          p_account_id?: string | null
           p_account_splits?: Record<string, unknown>[] | null
         }
         Returns: Record<string, unknown>
@@ -111,8 +119,7 @@ export type Database = {
           p_payment_date?: string
           p_payment_method?: string | null
           p_reference?: string | null
-          p_notes?: string | null
-          p_account_id?: string | null
+          p_account_splits?: Record<string, unknown>[] | null
         }
         Returns: Record<string, unknown>
       }
@@ -167,18 +174,6 @@ export type Database = {
       get_org_auth_events: {
         Args: { p_limit?: number }
         Returns: { user_id: string; event_type: string; ip_address: string | null; created_at: string }[]
-      }
-      get_platform_summary: {
-        Args: Record<string, never>
-        Returns: Record<string, unknown>[]
-      }
-      get_platform_organizations: {
-        Args: Record<string, never>
-        Returns: Record<string, unknown>[]
-      }
-      get_platform_recent_sign_ins: {
-        Args: { p_limit?: number }
-        Returns: Record<string, unknown>[]
       }
       has_permission: {
         Args: { permission_key: string }
