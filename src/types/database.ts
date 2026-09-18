@@ -179,6 +179,46 @@ export type Database = {
         Args: { permission_key: string }
         Returns: boolean
       }
+      get_platform_summary: {
+        Args: Record<string, never>
+        Returns: {
+          organizations_count: number
+          active_organizations_count: number
+          trialing_subscriptions_count: number
+          total_users_count: number
+          active_loans_count: number
+          total_active_portfolio: number
+        }[]
+      }
+      get_platform_organizations: {
+        Args: Record<string, never>
+        Returns: {
+          organization_id: string
+          commercial_name: string
+          status: string
+          created_at: string
+          plan_key: string | null
+          plan_name: string | null
+          subscription_status: string | null
+          users_count: number
+          clients_count: number
+          loans_count: number
+          included_users: number | null
+          included_clients: number | null
+          included_loans: number | null
+        }[]
+      }
+      get_platform_recent_sign_ins: {
+        Args: { p_limit?: number }
+        Returns: {
+          user_id: string
+          full_name: string | null
+          email: string | null
+          organization_id: string | null
+          organization_name: string | null
+          last_sign_in_at: string | null
+        }[]
+      }
     }
     Enums: Record<string, any>
   }
