@@ -63,7 +63,11 @@ export type Database = {
           p_term_installments: number
           p_disbursement_date: string
           p_first_payment_date: string
+<<<<<<< HEAD
           p_payment_day?: number | null
+=======
+          p_payment_day: number
+>>>>>>> a2d79fc1492d8e3ac62b57b5f18cd17ade2299c5
           p_account_id: string
           p_grace_days?: number
           p_late_fee_rate?: number
@@ -71,6 +75,14 @@ export type Database = {
           p_notes?: string | null
           p_biweekly_day_1?: number | null
           p_biweekly_day_2?: number | null
+        }
+        Returns: Record<string, unknown>
+      }
+      activate_loan_draft: {
+        Args: {
+          p_loan_id: string
+          p_account_id: string
+          p_disbursement_method?: string | null
         }
         Returns: Record<string, unknown>
       }

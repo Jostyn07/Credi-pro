@@ -72,6 +72,10 @@ export function RegistrarPagoModal({ loanId, open, onClose, onSuccess }: Registr
       reference: reference || undefined,
       notes: notes || undefined,
       prepaymentStrategy,
+      // Este modal no tiene UI de selección de cuentas — quedó reemplazado
+      // por la página RegistrarPago.tsx. No se usa en ningún lado del código
+      // (búscalo: no hay ningún import de RegistrarPagoModal). Bórralo.
+      accountSplits: [],
     })
     onSuccess()
     resetAndClose()

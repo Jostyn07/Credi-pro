@@ -291,9 +291,13 @@ export default function NuevoPrestamo() {
         termInstallments,
         disbursementDate,
         firstPaymentDate,
+<<<<<<< HEAD
         paymentDay: frequency === 'mensual' ? paymentDay : undefined,
         biweeklyDay1: frequency === 'quincenal' ? biweeklyDay1 : undefined,
         biweeklyDay2: frequency === 'quincenal' ? biweeklyDay2 : undefined,
+=======
+        paymentDay,
+>>>>>>> a2d79fc1492d8e3ac62b57b5f18cd17ade2299c5
         accountId,
         graceDays,
         lateFeeRate,

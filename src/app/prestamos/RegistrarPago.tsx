@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, Plus, Trash2 } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
@@ -12,6 +12,7 @@ import {
   PREPAYMENT_STRATEGY_REQUIRED_PREFIX,
   type PaymentAllocationPreview,
   type PrepaymentStrategy,
+  type AccountSplit,
 } from '@/services/payments'
 
 function formatCOP(value: number) {
@@ -57,12 +58,7 @@ export default function RegistrarPago() {
   const [amount, setAmount] = useState('')
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10))
   const [paymentMethod, setPaymentMethod] = useState('transferencia')
-  const [accountId, setAccountId] = useState('')
-  const [splitMode, setSplitMode] = useState(false)
-  const [splits, setSplits] = useState<{ accountId: string; amount: string }[]>([
-    { accountId: '', amount: '' },
-    { accountId: '', amount: '' },
-  ])
+  const [splits, setSplits] = useState<{ accountId: string; amount: string }[]>([{ accountId: '', amount: '' }])
   const [reference, setReference] = useState('')
   const [notes, setNotes] = useState('')
 
@@ -104,7 +100,27 @@ export default function RegistrarPago() {
     return () => clearTimeout(t)
   }, [id, amount, paymentDate])
 
-  // La cuota que se vería afectada primero es la más antigua sin pagar (así
+  useEffect(() => {
+    setSplits((prev) => (prev.length === 1 ? [{ ...prev[0], amount }] : prev))
+  }, [amount])
+
+  function addSplit() {
+    setSplits((prev) => [...prev, { accountId: '', amount: '' }])
+  }
+  function removeSplit(index: number) {
+    setSplits((prev) => prev.filter((_, i) => i !== index))
+  }
+  function updateSplit(index: number, field: 'accountId' | 'amount', value: string) {
+    setSplits((prev) => prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)))
+  }
+
+  const splitsSum = splits.reduce((s, sp) => s + (Number(sp.amount) || 0), 0)
+  const splitsValid =
+    splits.length > 0 &&
+    splits.every((s) => s.accountId && Number(s.amount) > 0) &&
+    Math.abs(splitsSum - Number(amount || 0)) < 1
+
+
   // aplica register_payment() en el backend: capital+interés+mora, más
   // antigua primero). Con eso estimamos en qué queda ESA cuota puntual —
   // no es una segunda fuente de verdad, es una proyección informativa sobre
@@ -126,26 +142,9 @@ export default function RegistrarPago() {
     }
   }
 
-  const splitsTotal = splits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0)
-  const splitsMismatch = splitMode && Number(amount) > 0 && Math.abs(splitsTotal - Number(amount)) > 0.01
-
-  function updateSplit(index: number, field: 'accountId' | 'amount', value: string) {
-    setSplits((prev) => prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)))
-  }
-
-  function addSplitRow() {
-    setSplits((prev) => [...prev, { accountId: '', amount: '' }])
-  }
-
-  function removeSplitRow(index: number) {
-    setSplits((prev) => prev.filter((_, i) => i !== index))
-  }
-
   async function submitPayment(prepaymentStrategy?: PrepaymentStrategy) {
     if (!id) return
-    const activeSplits = splitMode
-      ? splits.filter((s) => s.accountId && Number(s.amount) > 0).map((s) => ({ accountId: s.accountId, amount: Number(s.amount) }))
-      : []
+    const accountSplits: AccountSplit[] = splits.map((s) => ({ accountId: s.accountId, amount: Number(s.amount) }))
     await registerPayment({
       loanId: id,
       amount: Number(amount),
@@ -153,8 +152,7 @@ export default function RegistrarPago() {
       paymentMethod,
       reference: reference || undefined,
       notes: notes || undefined,
-      accountId: splitMode ? undefined : accountId || undefined,
-      accountSplits: activeSplits.length > 0 ? activeSplits : undefined,
+      accountSplits,
       prepaymentStrategy,
     })
     navigate(`/prestamos/${id}`)
@@ -163,8 +161,8 @@ export default function RegistrarPago() {
   async function handleSubmit() {
     if (!id) return
     setError(null)
-    if (splitsMismatch) {
-      setError('La suma de las cajas no coincide con el monto a pagar.')
+    if (!splitsValid) {
+      setError('Indica a qué cuenta(s) va el pago — la suma debe ser igual al monto total')
       return
     }
     setSubmitting(true)
@@ -294,85 +292,74 @@ export default function RegistrarPago() {
                       <option value="otro">Otro</option>
                     </select>
                   </div>
-                  {!splitMode && (
-                    <div>
-                      <label className="text-sm font-medium text-primary">Cuenta</label>
-                      <select
-                        className="mt-1.5 h-10 w-full rounded-lg border border-neutral-300 px-3 text-sm text-primary disabled:bg-neutral-50 disabled:text-neutral-400"
-                        value={accountId}
-                        onChange={(e) => setAccountId(e.target.value)}
-                        disabled={accounts.length === 0}
+                </div>
+
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <label className="text-sm font-medium text-primary">¿A qué cuenta(s) va este pago?</label>
+                    {splits.length < accounts.length && (
+                      <button
+                        type="button"
+                        onClick={addSplit}
+                        className="flex items-center gap-1 text-xs font-medium text-accent hover:underline"
                       >
-                        <option value="">{accounts.length === 0 ? 'Sin cuentas de caja' : 'Sin asignar'}</option>
-                        {accounts.map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.name}
-                          </option>
-                        ))}
-                      </select>
+                        <Plus size={12} /> Dividir entre otra cuenta
+                      </button>
+                    )}
+                  </div>
+
+                  {accounts.length === 0 ? (
+                    <p className="rounded-lg bg-warning-100 p-3 text-xs text-warning-700">
+                      No tienes ninguna cuenta de caja creada.{' '}
+                      <Link to="/caja" className="font-medium underline">
+                        Crea una en Caja
+                      </Link>{' '}
+                      antes de registrar el pago.
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {splits.map((split, i) => (
+                        <div key={i} className="flex gap-2">
+                          <select
+                            className="h-10 flex-1 rounded-lg border border-neutral-300 px-3 text-sm text-primary"
+                            value={split.accountId}
+                            onChange={(e) => updateSplit(i, 'accountId', e.target.value)}
+                          >
+                            <option value="">Selecciona una cuenta...</option>
+                            {accounts.map((a) => (
+                              <option key={a.id} value={a.id}>
+                                {a.name}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            placeholder="Monto"
+                            value={split.amount}
+                            onChange={(e) => updateSplit(i, 'amount', e.target.value)}
+                            disabled={splits.length === 1}
+                            className="h-10 w-32 rounded-lg border border-neutral-300 px-3 text-sm text-primary disabled:bg-neutral-50 disabled:text-neutral-400"
+                          />
+                          {splits.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeSplit(i)}
+                              className="rounded-lg p-2 text-neutral-400 hover:bg-neutral-100 hover:text-danger-600"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {splits.length > 1 && (
+                        <p className={`text-xs ${Math.abs(splitsSum - Number(amount || 0)) < 1 ? 'text-success-600' : 'text-danger-600'}`}>
+                          Suma: {formatCOP(splitsSum)} / {formatCOP(Number(amount || 0))}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
 
-                {accounts.length >= 2 && (
-                  <button
-                    type="button"
-                    onClick={() => setSplitMode((v) => !v)}
-                    className="self-start text-xs font-medium text-accent hover:underline"
-                  >
-                    {splitMode ? '← Usar una sola caja' : 'Dividir este pago entre varias cajas'}
-                  </button>
-                )}
-
-                {splitMode && (
-                  <div className="flex flex-col gap-3 rounded-lg border border-neutral-200 p-3">
-                    <p className="text-xs font-medium text-neutral-500">
-                      El pago queda como un solo registro; solo se reparten los movimientos de caja.
-                    </p>
-                    {splits.map((s, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <select
-                          className="h-10 flex-1 rounded-lg border border-neutral-300 px-3 text-sm text-primary"
-                          value={s.accountId}
-                          onChange={(e) => updateSplit(i, 'accountId', e.target.value)}
-                        >
-                          <option value="">Selecciona una caja</option>
-                          {accounts.map((a) => (
-                            <option key={a.id} value={a.id}>
-                              {a.name}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          type="number"
-                          value={s.amount}
-                          onChange={(e) => updateSplit(i, 'amount', e.target.value)}
-                          placeholder="Monto"
-                          className="h-10 w-32 rounded-lg border border-neutral-300 px-3 text-sm text-primary"
-                        />
-                        {splits.length > 2 && (
-                          <button
-                            type="button"
-                            onClick={() => removeSplitRow(i)}
-                            className="text-xs text-neutral-400 hover:text-status-danger"
-                          >
-                            Quitar
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={addSplitRow}
-                      className="self-start text-xs font-medium text-accent hover:underline"
-                    >
-                      + Agregar otra caja
-                    </button>
-                    <p className={`text-xs ${splitsMismatch ? 'text-status-danger' : 'text-neutral-400'}`}>
-                      Suma: {formatCOP(splitsTotal)} de {formatCOP(Number(amount) || 0)} a pagar
-                    </p>
-                  </div>
-                )}
 
                 <Input label="Referencia (opcional)" value={reference} onChange={(e) => setReference(e.target.value)} />
                 <Input label="Notas (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
@@ -385,7 +372,7 @@ export default function RegistrarPago() {
                   </Button>
                   <Button
                     loading={submitting}
-                    disabled={!amount || Number(amount) <= 0 || splitsMismatch}
+                    disabled={!amount || Number(amount) <= 0 || !splitsValid}
                     onClick={handleSubmit}
                     className="flex-1"
                   >
