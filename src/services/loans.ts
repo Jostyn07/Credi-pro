@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabaseClient'
 
 export type InterestModality = 'saldo_pendiente' | 'capital_inicial' | 'fijo'
+export type PaymentFrequency = 'semanal' | 'quincenal' | 'mensual'
 export type LoanStatus = 'draft' | 'active' | 'liquidated' | 'cancelled' | 'refinanced' | 'restructured'
 
 export interface AmortizationRow {
@@ -28,10 +29,13 @@ export interface LoanConditions {
   principal: number
   interest_rate: number
   interest_modality: InterestModality
-  term_months: number
+  payment_frequency: PaymentFrequency
+  term_installments: number
   disbursement_date: string
   first_payment_date: string
-  payment_day: number
+  payment_day: number | null
+  biweekly_day_1: number | null
+  biweekly_day_2: number | null
   grace_days: number
   late_fee_rate: number
 }
@@ -55,30 +59,52 @@ export interface CreateLoanInput {
   principal: number
   interestRate: number
   interestModality: InterestModality
-  termMonths: number
+  // La tasa (interestRate) SIEMPRE es por período: si frequency es
+  // 'semanal', es tasa semanal; si es 'quincenal', tasa quincenal; si es
+  // 'mensual', tasa mensual. No hay conversión automática entre frecuencias.
+  frequency: PaymentFrequency
+  // Número de cuotas -- reemplaza al antiguo termMonths, vale para las 3 frecuencias.
+  termInstallments: number
   disbursementDate: string
   firstPaymentDate: string
-  paymentDay: number
+  // Solo aplica a frecuencia 'mensual' (día del mes). En 'semanal' el día
+  // de la semana lo fija firstPaymentDate; en 'quincenal' se usan
+  // biweeklyDay1/biweeklyDay2 en su lugar.
+  paymentDay?: number
+  // Obligatorios solo si frequency === 'quincenal'.
+  biweeklyDay1?: number
+  biweeklyDay2?: number
+  accountId: string
   graceDays?: number
   lateFeeRate?: number
   disbursementMethod?: string
   notes?: string
 }
 
+// Un borrador aún no se desembolsa, así que no exige cuenta de caja todavía
+// (esa decisión se toma cuando el préstamo pasa a activo de verdad).
+export type SaveLoanDraftInput = Omit<CreateLoanInput, 'accountId'>
+
 // Vista previa del calendario SIN crear el préstamo — usada en el wizard
 export async function previewAmortization(
   principal: number,
   interestRate: number,
   modality: InterestModality,
-  termMonths: number,
+  frequency: PaymentFrequency,
+  termInstallments: number,
   firstPaymentDate: string,
+  biweeklyDay1?: number | null,
+  biweeklyDay2?: number | null,
 ): Promise<AmortizationRow[]> {
   const { data, error } = await supabase.rpc('preview_amortization', {
     p_principal: principal,
     p_interest_rate: interestRate,
     p_modality: modality,
-    p_term_months: termMonths,
+    p_frequency: frequency,
+    p_term_installments: termInstallments,
     p_first_payment_date: firstPaymentDate,
+    p_biweekly_day_1: biweeklyDay1 ?? null,
+    p_biweekly_day_2: biweeklyDay2 ?? null,
   })
   if (error) throw error
   return data as unknown as AmortizationRow[]
@@ -90,35 +116,53 @@ export async function createLoan(input: CreateLoanInput): Promise<Loan> {
     p_principal: input.principal,
     p_interest_rate: input.interestRate,
     p_interest_modality: input.interestModality,
-    p_term_months: input.termMonths,
+    p_frequency: input.frequency,
+    p_term_installments: input.termInstallments,
     p_disbursement_date: input.disbursementDate,
     p_first_payment_date: input.firstPaymentDate,
-    p_payment_day: input.paymentDay,
+    p_payment_day: input.paymentDay ?? null,
+    p_account_id: input.accountId,
     p_grace_days: input.graceDays ?? 0,
     p_late_fee_rate: input.lateFeeRate ?? 0,
     p_disbursement_method: input.disbursementMethod ?? null,
     p_notes: input.notes ?? null,
+    p_biweekly_day_1: input.biweeklyDay1 ?? null,
+    p_biweekly_day_2: input.biweeklyDay2 ?? null,
   })
   if (error) throw error
   return data as unknown as Loan
 }
 
 // Guarda el préstamo con estado 'draft': cliente + condiciones, sin
-// desembolso ni cuotas todavía. Requiere la migración
-// supabase/migrations/20260917_loan_notes_and_drafts.sql.
-export async function saveLoanDraft(input: CreateLoanInput): Promise<Loan> {
+// desembolso ni cuotas todavía. Requiere la migración 0010_payment_frequency.sql.
+export async function saveLoanDraft(input: SaveLoanDraftInput): Promise<Loan> {
   const { data, error } = await supabase.rpc('save_loan_draft', {
     p_client_id: input.clientId,
     p_principal: input.principal,
     p_interest_rate: input.interestRate,
     p_interest_modality: input.interestModality,
-    p_term_months: input.termMonths,
+    p_frequency: input.frequency,
+    p_term_installments: input.termInstallments,
     p_disbursement_date: input.disbursementDate,
     p_first_payment_date: input.firstPaymentDate,
-    p_payment_day: input.paymentDay,
+    p_payment_day: input.paymentDay ?? null,
     p_grace_days: input.graceDays ?? 0,
     p_late_fee_rate: input.lateFeeRate ?? 0,
     p_notes: input.notes ?? null,
+    p_biweekly_day_1: input.biweeklyDay1 ?? null,
+    p_biweekly_day_2: input.biweeklyDay2 ?? null,
+  })
+  if (error) throw error
+  return data as unknown as Loan
+}
+
+// Aprueba un préstamo en borrador: exige cuenta de caja, genera el
+// desembolso, el movimiento de caja y las cuotas — recién ahí queda 'active'.
+export async function activateLoanDraft(loanId: string, accountId: string, disbursementMethod?: string): Promise<Loan> {
+  const { data, error } = await supabase.rpc('activate_loan_draft', {
+    p_loan_id: loanId,
+    p_account_id: accountId,
+    p_disbursement_method: disbursementMethod ?? null,
   })
   if (error) throw error
   return data as unknown as Loan

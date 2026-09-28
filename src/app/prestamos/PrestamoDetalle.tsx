@@ -28,6 +28,7 @@ import { getPaymentsByLoan, type Payment } from '@/services/payments'
 import { getContractsByLoan, generateContract, type Contract } from '@/services/contracts'
 import { getCollectionActions, getPaymentPromises, type CollectionAction, type PaymentPromise } from '@/services/collection'
 import { RegistrarGestionModal } from '@/app/organizacion/RegistrarGestionModal'
+import { AprobarPrestamoModal } from './AprobarPrestamoModal'
 
 function formatCOP(value: number) {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(
@@ -96,6 +97,7 @@ export default function PrestamoDetalle() {
   const [tab, setTab] = useState<TabKey>('resumen')
   const [showActionsMenu, setShowActionsMenu] = useState(false)
   const [showGestionModal, setShowGestionModal] = useState(false)
+  const [showAprobarModal, setShowAprobarModal] = useState(false)
   const [generatingContract, setGeneratingContract] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -219,6 +221,18 @@ export default function PrestamoDetalle() {
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setShowActionsMenu(false)} />
                 <div className="absolute right-0 z-20 mt-2 w-56 rounded-lg border border-neutral-200 bg-white py-1 shadow-lg">
+                  {loan.status === 'draft' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowActionsMenu(false)
+                        setShowAprobarModal(true)
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-success-700 hover:bg-neutral-50"
+                    >
+                      <CreditCard size={15} /> Aprobar préstamo
+                    </button>
+                  )}
                   {canOperate && (
                     <button
                       type="button"
@@ -369,8 +383,27 @@ export default function PrestamoDetalle() {
                       </dd>
                     </div>
                     <div>
+                      <dt className="text-neutral-400">Frecuencia</dt>
+                      <dd className="font-medium text-primary">
+                        {conditions.payment_frequency === 'semanal'
+                          ? 'Semanal'
+                          : conditions.payment_frequency === 'quincenal'
+                            ? 'Quincenal'
+                            : 'Mensual'}
+                      </dd>
+                    </div>
+                    <div>
                       <dt className="text-neutral-400">Plazo</dt>
-                      <dd className="font-medium text-primary">{conditions.term_months} meses</dd>
+                      <dd className="font-medium text-primary">{conditions.term_installments} cuotas</dd>
+                    </div>
+                    <div>
+                      <dt className="text-neutral-400">Día(s) de pago</dt>
+                      <dd className="font-medium text-primary">
+                        {conditions.payment_frequency === 'mensual' && `${conditions.payment_day} de cada mes`}
+                        {conditions.payment_frequency === 'quincenal' &&
+                          `${conditions.biweekly_day_1} y ${conditions.biweekly_day_2} de cada mes`}
+                        {conditions.payment_frequency === 'semanal' && 'Cada 7 días'}
+                      </dd>
                     </div>
                     <div>
                       <dt className="text-neutral-400">Días de gracia</dt>
@@ -590,6 +623,13 @@ export default function PrestamoDetalle() {
         loanId={loan.id}
         open={showGestionModal}
         onClose={() => setShowGestionModal(false)}
+        onSuccess={loadData}
+      />
+
+      <AprobarPrestamoModal
+        loanId={loan.id}
+        open={showAprobarModal}
+        onClose={() => setShowAprobarModal(false)}
         onSuccess={loadData}
       />
     </div>

@@ -28,8 +28,16 @@ import {
   type ClientProfileSummary,
   type ClientEvaluationMetrics,
 } from '@/services/clients'
-import { createLoan, saveLoanDraft, previewAmortization, type AmortizationRow, type InterestModality } from '@/services/loans'
+import {
+  createLoan,
+  saveLoanDraft,
+  previewAmortization,
+  type AmortizationRow,
+  type InterestModality,
+  type PaymentFrequency,
+} from '@/services/loans'
 import { generateContract } from '@/services/contracts'
+import { getAccounts, type Account } from '@/services/accounts'
 import { QuickNewClientModal } from './QuickNewClientModal'
 
 const STEPS = [
@@ -44,6 +52,21 @@ const modalityLabels: Record<InterestModality, string> = {
   saldo_pendiente: 'Sobre saldo pendiente',
   capital_inicial: 'Sobre capital inicial',
   fijo: 'Cuota fija (sistema francés)',
+}
+
+const frequencyLabels: Record<PaymentFrequency, string> = {
+  semanal: 'Semanal',
+  quincenal: 'Quincenal',
+  mensual: 'Mensual',
+}
+
+// La tasa de interés siempre se ingresa por período (sin conversión
+// automática): esta etiqueta solo aclara a qué período se refiere el % que
+// el usuario está escribiendo en "Tasa de interés".
+const rateFrequencyLabel: Record<PaymentFrequency, string> = {
+  semanal: '% semanal',
+  quincenal: '% quincenal',
+  mensual: '% mensual',
 }
 
 // "Modalidad de cálculo" ya define completamente cómo se arma cada cuota en
@@ -122,16 +145,25 @@ export default function NuevoPrestamo() {
   const [principal, setPrincipal] = useState(preselectedAmount ? Number(preselectedAmount) : 5000000)
   const [interestRate, setInterestRate] = useState(5)
   const [interestModality, setInterestModality] = useState<InterestModality>('saldo_pendiente')
-  const [termMonths, setTermMonths] = useState(preselectedTerm ? Number(preselectedTerm) : 6)
+  const [frequency, setFrequency] = useState<PaymentFrequency>('mensual')
+  const [termInstallments, setTermInstallments] = useState(preselectedTerm ? Number(preselectedTerm) : 6)
   const [disbursementDate, setDisbursementDate] = useState(new Date().toISOString().slice(0, 10))
   const [firstPaymentDate, setFirstPaymentDate] = useState('')
+  // Solo aplica a frecuencia 'mensual'. En 'semanal' el día de la semana lo
+  // fija firstPaymentDate; en 'quincenal' se usan biweeklyDay1/2 en su lugar.
   const [paymentDay, setPaymentDay] = useState(5)
+  const [biweeklyDay1, setBiweeklyDay1] = useState(15)
+  const [biweeklyDay2, setBiweeklyDay2] = useState(30)
   const [graceDays, setGraceDays] = useState(3)
   const [lateFeeRate, setLateFeeRate] = useState(2)
 
   const [schedule, setSchedule] = useState<AmortizationRow[]>([])
   const [loadingSchedule, setLoadingSchedule] = useState(false)
   const [showFullSchedule, setShowFullSchedule] = useState(false)
+
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [accountId, setAccountId] = useState('')
+  const [loadingAccounts, setLoadingAccounts] = useState(true)
 
   const [generateContractDoc, setGenerateContractDoc] = useState(true)
   const [notes, setNotes] = useState('')
@@ -141,6 +173,12 @@ export default function NuevoPrestamo() {
 
   useEffect(() => {
     getClients().then(setClients)
+    getAccounts()
+      .then((accs) => {
+        setAccounts(accs)
+        if (accs.length === 1) setAccountId(accs[0].id)
+      })
+      .finally(() => setLoadingAccounts(false))
   }, [])
 
   const selectedClient = clients.find((c) => c.id === clientId)
@@ -168,19 +206,32 @@ export default function NuevoPrestamo() {
   // "Siguiente". Así el resumen del paso Condiciones y el paso Calendario
   // siempre muestran el mismo cálculo real, sin duplicar la llamada.
   useEffect(() => {
-    if (!firstPaymentDate || principal <= 0 || termMonths <= 0) {
+    if (!firstPaymentDate || principal <= 0 || termInstallments <= 0) {
+      setSchedule([])
+      return
+    }
+    if (frequency === 'quincenal' && (!biweeklyDay1 || !biweeklyDay2 || biweeklyDay1 === biweeklyDay2)) {
       setSchedule([])
       return
     }
     setLoadingSchedule(true)
     const t = setTimeout(() => {
-      previewAmortization(principal, interestRate, interestModality, termMonths, firstPaymentDate)
+      previewAmortization(
+        principal,
+        interestRate,
+        interestModality,
+        frequency,
+        termInstallments,
+        firstPaymentDate,
+        frequency === 'quincenal' ? biweeklyDay1 : null,
+        frequency === 'quincenal' ? biweeklyDay2 : null,
+      )
         .then(setSchedule)
         .catch(() => setSchedule([]))
         .finally(() => setLoadingSchedule(false))
     }, 350)
     return () => clearTimeout(t)
-  }, [principal, interestRate, interestModality, termMonths, firstPaymentDate])
+  }, [principal, interestRate, interestModality, frequency, termInstallments, firstPaymentDate, biweeklyDay1, biweeklyDay2])
 
   const clientSearchNormalized = clientSearch.trim().toLowerCase()
   const filteredClients = clients.filter((c) => {
@@ -206,9 +257,23 @@ export default function NuevoPrestamo() {
 
   function goToStep3() {
     setError(null)
+    if (!accountId) {
+      setError('Selecciona la cuenta de caja desde la que se desembolsará el préstamo')
+      return
+    }
     if (!firstPaymentDate) {
       setError('Selecciona la fecha de la primera cuota')
       return
+    }
+    if (frequency === 'quincenal') {
+      if (!biweeklyDay1 || !biweeklyDay2) {
+        setError('Indica los dos días de pago del mes para la frecuencia quincenal')
+        return
+      }
+      if (biweeklyDay1 === biweeklyDay2) {
+        setError('Los dos días de pago quincenales deben ser distintos')
+        return
+      }
     }
     setStep(3)
   }
@@ -222,10 +287,14 @@ export default function NuevoPrestamo() {
         principal,
         interestRate,
         interestModality,
-        termMonths,
+        frequency,
+        termInstallments,
         disbursementDate,
         firstPaymentDate,
-        paymentDay,
+        paymentDay: frequency === 'mensual' ? paymentDay : undefined,
+        biweeklyDay1: frequency === 'quincenal' ? biweeklyDay1 : undefined,
+        biweeklyDay2: frequency === 'quincenal' ? biweeklyDay2 : undefined,
+        accountId,
         graceDays,
         lateFeeRate,
         notes: notes || undefined,
@@ -260,10 +329,13 @@ export default function NuevoPrestamo() {
         principal,
         interestRate,
         interestModality,
-        termMonths,
+        frequency,
+        termInstallments,
         disbursementDate,
         firstPaymentDate,
-        paymentDay,
+        paymentDay: frequency === 'mensual' ? paymentDay : undefined,
+        biweeklyDay1: frequency === 'quincenal' ? biweeklyDay1 : undefined,
+        biweeklyDay2: frequency === 'quincenal' ? biweeklyDay2 : undefined,
         graceDays,
         lateFeeRate,
         notes: notes || undefined,
@@ -285,6 +357,19 @@ export default function NuevoPrestamo() {
         <h1 className="mb-6 text-xl font-semibold text-primary">Nuevo préstamo</h1>
 
         <Card>
+          {!loadingAccounts && accounts.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-10 text-center">
+              <p className="text-sm font-medium text-primary">
+                Necesitas crear al menos una cuenta de caja antes de registrar un préstamo.
+              </p>
+              <p className="max-w-sm text-xs text-neutral-500">
+                Todo desembolso sale de una cuenta real (efectivo, banco, billetera) para que tu caja siempre
+                cuadre. Crea la primera cuenta y vuelve aquí.
+              </p>
+              <Button onClick={() => navigate('/caja')}>Ir a Caja</Button>
+            </div>
+          ) : (
+          <>
           <Stepper steps={STEPS} currentStep={step} />
 
           {step === 1 && (
@@ -465,7 +550,7 @@ export default function NuevoPrestamo() {
                     onChange={(e) => setPrincipal(Number(e.target.value))}
                   />
                   <Input
-                    label="Tasa de interés (% mensual)"
+                    label={`Tasa de interés (${rateFrequencyLabel[frequency]})`}
                     type="number"
                     step="0.1"
                     value={interestRate}
@@ -497,21 +582,76 @@ export default function NuevoPrestamo() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-primary">Frecuencia de pago</label>
+                    <select
+                      className="mt-1.5 h-10 w-full rounded-lg border border-neutral-300 px-3 text-sm text-primary"
+                      value={frequency}
+                      onChange={(e) => setFrequency(e.target.value as PaymentFrequency)}
+                    >
+                      {Object.entries(frequencyLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <Input
-                    label="Plazo (meses)"
+                    label="Plazo (número de cuotas)"
                     type="number"
-                    value={termMonths}
-                    onChange={(e) => setTermMonths(Number(e.target.value))}
-                  />
-                  <Input
-                    label="Día de pago"
-                    type="number"
-                    min={1}
-                    max={28}
-                    value={paymentDay}
-                    onChange={(e) => setPaymentDay(Number(e.target.value))}
+                    value={termInstallments}
+                    onChange={(e) => setTermInstallments(Number(e.target.value))}
                   />
                 </div>
+
+                {frequency === 'mensual' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input
+                      label="Día de pago"
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={paymentDay}
+                      onChange={(e) => setPaymentDay(Number(e.target.value))}
+                    />
+                    <div className="flex items-end pb-2.5 text-xs text-neutral-400">
+                      Cada cuota vence ese día del mes (se ajusta en meses cortos).
+                    </div>
+                  </div>
+                )}
+
+                {frequency === 'quincenal' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input
+                      label="Primer día de pago del mes"
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={biweeklyDay1}
+                      onChange={(e) => setBiweeklyDay1(Number(e.target.value))}
+                    />
+                    <Input
+                      label="Segundo día de pago del mes"
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={biweeklyDay2}
+                      onChange={(e) => setBiweeklyDay2(Number(e.target.value))}
+                    />
+                  </div>
+                )}
+                {frequency === 'quincenal' && (
+                  <p className="-mt-2 text-xs text-neutral-400">
+                    Las cuotas alternan entre esos dos días de cada mes (ej. 15 y 30). En meses cortos se ajustan
+                    automáticamente al último día disponible.
+                  </p>
+                )}
+                {frequency === 'semanal' && (
+                  <p className="-mt-2 text-xs text-neutral-400">
+                    El día de la semana lo fija la fecha de la primera cuota; cada cuota siguiente cae 7 días
+                    después.
+                  </p>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <Input
@@ -526,6 +666,25 @@ export default function NuevoPrestamo() {
                     value={firstPaymentDate}
                     onChange={(e) => setFirstPaymentDate(e.target.value)}
                   />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-primary">Cuenta de desembolso</label>
+                  <select
+                    className="mt-1.5 h-10 w-full rounded-lg border border-neutral-300 px-3 text-sm text-primary"
+                    value={accountId}
+                    onChange={(e) => setAccountId(e.target.value)}
+                  >
+                    <option value="">Selecciona una cuenta...</option>
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-neutral-400">
+                    El monto se descontará automáticamente de esta cuenta al crear el préstamo.
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -565,15 +724,23 @@ export default function NuevoPrestamo() {
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-neutral-500">Tasa de interés</dt>
-                    <dd className="font-medium text-primary">{interestRate}% mensual</dd>
+                    <dd className="font-medium text-primary">{interestRate}{rateFrequencyLabel[frequency]}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-neutral-500">Frecuencia</dt>
+                    <dd className="font-medium text-primary">{frequencyLabels[frequency]}</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-neutral-500">Plazo</dt>
-                    <dd className="font-medium text-primary">{termMonths} meses</dd>
+                    <dd className="font-medium text-primary">{termInstallments} cuotas</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-neutral-500">Día de pago</dt>
-                    <dd className="font-medium text-primary">{paymentDay} de cada mes</dd>
+                    <dt className="text-neutral-500">Día(s) de pago</dt>
+                    <dd className="font-medium text-primary">
+                      {frequency === 'mensual' && `${paymentDay} de cada mes`}
+                      {frequency === 'quincenal' && `${biweeklyDay1} y ${biweeklyDay2} de cada mes`}
+                      {frequency === 'semanal' && 'Cada 7 días desde la primera cuota'}
+                    </dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-neutral-500">Primera cuota</dt>
@@ -608,12 +775,16 @@ export default function NuevoPrestamo() {
                   <p className="font-medium text-primary">{firstPaymentDate ? formatDate(firstPaymentDate) : '—'}</p>
                 </div>
                 <div>
-                  <p className="text-neutral-400">Día de pago</p>
-                  <p className="font-medium text-primary">{paymentDay} de cada mes</p>
+                  <p className="text-neutral-400">Día(s) de pago</p>
+                  <p className="font-medium text-primary">
+                    {frequency === 'mensual' && `${paymentDay} de cada mes`}
+                    {frequency === 'quincenal' && `${biweeklyDay1} y ${biweeklyDay2} de cada mes`}
+                    {frequency === 'semanal' && 'Cada 7 días'}
+                  </p>
                 </div>
               </div>
 
-              <p className="text-sm font-medium text-primary">Vista previa del calendario</p>
+              <p className="text-sm font-medium text-primary">Vista previa del calendario ({frequencyLabels[frequency]})</p>
               {loadingSchedule ? (
                 <div className="flex justify-center py-8">
                   <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" />
@@ -775,13 +946,21 @@ export default function NuevoPrestamo() {
                   {[
                     ['Cliente', `${selectedClient?.full_name ?? '—'}${selectedClient?.identification ? ` (CC ${selectedClient.identification})` : ''}`],
                     ['Monto solicitado', formatCOP(principal)],
-                    ['Tasa de interés', `${interestRate}% mensual`],
+                    ['Tasa de interés', `${interestRate}${rateFrequencyLabel[frequency]}`],
                     ['Modalidad', modalityLabels[interestModality]],
                     ['Método de cuotas', installmentMethodLabel[interestModality]],
-                    ['Plazo', `${termMonths} meses`],
+                    ['Frecuencia', frequencyLabels[frequency]],
+                    ['Plazo', `${termInstallments} cuotas`],
                     ['Fecha de desembolso', formatDate(disbursementDate)],
                     ['Primera cuota', firstPaymentDate ? formatDate(firstPaymentDate) : '—'],
-                    ['Día de pago', `${paymentDay} de cada mes`],
+                    [
+                      'Día(s) de pago',
+                      frequency === 'mensual'
+                        ? `${paymentDay} de cada mes`
+                        : frequency === 'quincenal'
+                          ? `${biweeklyDay1} y ${biweeklyDay2} de cada mes`
+                          : 'Cada 7 días desde la primera cuota',
+                    ],
                     ['Días de gracia', `${graceDays} días`],
                     ['Tasa de mora', `${lateFeeRate}% mensual`],
                   ].map(([label, value]) => (
@@ -848,6 +1027,8 @@ export default function NuevoPrestamo() {
                 </div>
               </div>
             </div>
+          )}
+          </>
           )}
         </Card>
       </div>

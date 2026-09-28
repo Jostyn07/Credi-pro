@@ -100,6 +100,7 @@ export default function RecomendacionPrestamo() {
       recommendation.suggestedAmount,
       interestRate,
       interestModality,
+      'mensual',
       termMonths,
       firstPayment.toISOString().slice(0, 10),
     )
