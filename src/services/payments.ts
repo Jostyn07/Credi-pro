@@ -70,6 +70,17 @@ export const PREPAYMENT_STRATEGY_REQUIRED_PREFIX = 'PREPAYMENT_STRATEGY_REQUIRED
 // La distribución entre cuentas ahora es obligatoria (ver migración
 // 0008_caja_obligatoria.sql) — un pago siempre debe decir de dónde "entra"
 // el dinero, aunque sea a una sola cuenta.
+
+// PostgrestError no es instancia de Error en supabase-js 2.45, así que la UI
+// mostraba solo el mensaje genérico. Lo convertimos para ver el error real.
+function toError(error: { message?: string; details?: string | null; hint?: string | null; code?: string }): Error {
+  const parts = [error.message, error.details, error.hint].filter(Boolean)
+  const err = new Error(parts.join(' — ') || 'Error desconocido en la base de datos')
+  ;(err as Error & { code?: string }).code = error.code
+  console.error('[payments] RPC error', error)
+  return err
+}
+
 export async function registerPayment(input: RegisterPaymentInput): Promise<Payment> {
   const { data, error } = await supabase.rpc('register_payment', {
     p_loan_id: input.loanId,
@@ -81,7 +92,7 @@ export async function registerPayment(input: RegisterPaymentInput): Promise<Paym
     p_prepayment_strategy: input.prepaymentStrategy ?? null,
     p_account_splits: toSplitsJson(input.accountSplits),
   })
-  if (error) throw error
+  if (error) throw toError(error)
   return data as unknown as Payment
 }
 
@@ -101,7 +112,7 @@ export async function liquidateLoan(input: LiquidateLoanInput): Promise<Payment>
     p_reference: input.reference ?? null,
     p_account_splits: toSplitsJson(input.accountSplits),
   })
-  if (error) throw error
+  if (error) throw toError(error)
   return data as unknown as Payment
 }
 
