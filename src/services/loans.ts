@@ -1,5 +1,15 @@
 import { supabase } from '@/lib/supabaseClient'
 
+
+// PostgrestError no es instancia de Error: sin esto la UI solo muestra el mensaje genérico.
+function toError(error: { message?: string; details?: string | null; hint?: string | null; code?: string }): Error {
+  const parts = [error.message, error.details, error.hint].filter(Boolean)
+  const err = new Error(parts.join(' — ') || 'Error desconocido en la base de datos')
+  ;(err as Error & { code?: string }).code = error.code
+  console.error('[loans] DB error', error)
+  return err
+}
+
 export type InterestModality = 'saldo_pendiente' | 'capital_inicial' | 'fijo'
 export type PaymentFrequency = 'semanal' | 'quincenal' | 'mensual'
 export type LoanStatus = 'draft' | 'active' | 'liquidated' | 'cancelled' | 'refinanced' | 'restructured'
@@ -106,7 +116,7 @@ export async function previewAmortization(
     p_biweekly_day_1: biweeklyDay1 ?? null,
     p_biweekly_day_2: biweeklyDay2 ?? null,
   })
-  if (error) throw error
+  if (error) throw toError(error)
   return data as unknown as AmortizationRow[]
 }
 
@@ -129,7 +139,7 @@ export async function createLoan(input: CreateLoanInput): Promise<Loan> {
     p_biweekly_day_1: input.biweeklyDay1 ?? null,
     p_biweekly_day_2: input.biweeklyDay2 ?? null,
   })
-  if (error) throw error
+  if (error) throw toError(error)
   return data as unknown as Loan
 }
 
@@ -152,7 +162,7 @@ export async function saveLoanDraft(input: SaveLoanDraftInput): Promise<Loan> {
     p_biweekly_day_1: input.biweeklyDay1 ?? null,
     p_biweekly_day_2: input.biweeklyDay2 ?? null,
   })
-  if (error) throw error
+  if (error) throw toError(error)
   return data as unknown as Loan
 }
 
@@ -164,7 +174,7 @@ export async function activateLoanDraft(loanId: string, accountId: string, disbu
     p_account_id: accountId,
     p_disbursement_method: disbursementMethod ?? null,
   })
-  if (error) throw error
+  if (error) throw toError(error)
   return data as unknown as Loan
 }
 
@@ -173,7 +183,7 @@ export async function getLoans(): Promise<Loan[]> {
     .from('loans')
     .select('*, clients(full_name, identification)')
     .order('created_at', { ascending: false })
-  if (error) throw error
+  if (error) throw toError(error)
   return data as unknown as Loan[]
 }
 
@@ -183,13 +193,13 @@ export async function getLoansByClient(clientId: string): Promise<Loan[]> {
     .select('*, clients(full_name, identification)')
     .eq('client_id', clientId)
     .order('created_at', { ascending: false })
-  if (error) throw error
+  if (error) throw toError(error)
   return data as unknown as Loan[]
 }
 
 export async function getLoan(id: string): Promise<Loan> {
   const { data, error } = await supabase.from('loans').select('*, clients(full_name, identification)').eq('id', id).single()
-  if (error) throw error
+  if (error) throw toError(error)
   return data as unknown as Loan
 }
 
@@ -199,7 +209,7 @@ export async function getLoanConditions(loanId: string): Promise<LoanConditions>
     .select('*')
     .eq('loan_id', loanId)
     .single()
-  if (error) throw error
+  if (error) throw toError(error)
   return data as unknown as LoanConditions
 }
 
@@ -209,6 +219,6 @@ export async function getInstallments(loanId: string): Promise<Installment[]> {
     .select('*')
     .eq('loan_id', loanId)
     .order('number')
-  if (error) throw error
+  if (error) throw toError(error)
   return data as unknown as Installment[]
 }
